@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9034027b3874ff64fa5eff705916d002, type: 3}
   m_Name: MusicVolume
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Settings.GameSetting
-  settingName: 
+  settingName: Music
   displayText: 
   dataType: 0
   minValue: 0
