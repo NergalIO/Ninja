@@ -1,5 +1,9 @@
-using Ninja.InGame.InputSystem;
 using UnityEngine;
+
+using Ninja.Input;
+using Unity.Mathematics;
+
+
 namespace Ninja.Gameplay.Player
 {
     public class NoiseController : MonoBehaviour
@@ -10,6 +14,9 @@ namespace Ninja.Gameplay.Player
 
         [Header("Preference")]
         [SerializeField] private float defaultNoise;
+
+        [Header("Variables")]
+        [SerializeField] private float lerpTime = 5f;
 
         public void Awake()
         {
@@ -27,7 +34,13 @@ namespace Ninja.Gameplay.Player
 
         public void FixedUpdate()
         {
-            noiseArea.radius = defaultNoise * controller.CurrentSpeed.magnitude;
+            float targetValue = defaultNoise * controller.CurrentSpeed.magnitude;
+            noiseArea.radius = Mathf.Lerp(noiseArea.radius, targetValue, lerpTime);
+        }
+
+        public void OnDrawGizmos()
+        {
+            Gizmos.DrawWireSphere(noiseArea.transform.position, noiseArea.radius);
         }
     }
 }

@@ -445,14 +445,14 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6584419443970466200}
-  - component: {fileID: 7189155061286624548}
+  - component: {fileID: 7631589986980683730}
   m_Layer: 5
   m_Name: LoaderMenu
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &6584419443970466200
 RectTransform:
   m_ObjectHideFlags: 0
@@ -473,7 +473,7 @@ RectTransform:
   m_AnchoredPosition: {x: 2413.3552, y: 27854.809}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &7189155061286624548
+--- !u!114 &7631589986980683730
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -482,20 +482,21 @@ MonoBehaviour:
   m_GameObject: {fileID: 5499661339317750358}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f86a66b9cc3aabe40bfe4f6f633bb67b, type: 3}
+  m_Script: {fileID: 11500000, guid: ac1ae3c817279d947b19ad7d4a872638, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Ninja.UI.LoaderMenu
-  sceneLoader: {fileID: 0}
-  progressSlider: {fileID: 3557102753479797232}
-  hintCollection: {fileID: 11400000, guid: 7a993a52cca5ad84f849294cc59b168c, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.UI.Loading.LoadingPanel
+  closeButton: {fileID: 0}
+  state: 0
+  progressBar: {fileID: 3557102753479797232}
+  LoadingHints: {fileID: 11400000, guid: fe10ca68a14ad214d8b48e3f6960f9f0, type: 2}
   hintText: {fileID: 5919477806900815008}
-  timeToChangeHint: 2
-  lastTimeHintChanged: 0
-  currentBackground: {fileID: 379232794310648246}
-  timeToChangeImage: 3
-  lastTimeImageChanged: 0
-  text: {fileID: 7985466744495093510}
-  spaceIsPressed: 0
+  hintUpdateInterval: 5
+  hintLastUpdateTime: 0
+  LoadingBackgrounds: {fileID: 11400000, guid: debd3be85d946624ea45280ed573328c, type: 2}
+  backgroundImage: {fileID: 379232794310648246}
+  backgroundUpdateInterval: 5
+  backgroundLastUpdateTime: 0
+  fadeDuration: 1
 --- !u!1 &5942477427687441243
 GameObject:
   m_ObjectHideFlags: 0
@@ -719,7 +720,7 @@ RectTransform:
   m_Father: {fileID: 4822072103519217915}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}

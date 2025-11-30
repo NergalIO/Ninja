@@ -1,5 +1,6 @@
 using UnityEngine;
 
+
 namespace Ninja.Gameplay.Levels
 {
     [CreateAssetMenu(fileName = "Level", menuName = "Ninja/Level")]
@@ -7,8 +8,10 @@ namespace Ninja.Gameplay.Levels
     {
         [SerializeField] private string id;
         [SerializeField] private string levelName;
+        [SerializeField] private string description;
 
         public string Id => id;
         public string LevelName => levelName;
+        public string Description => description;
     }
 }

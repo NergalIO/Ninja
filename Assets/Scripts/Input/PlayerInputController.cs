@@ -1,4 +1,6 @@
 using UnityEngine;
+
+
 namespace Ninja.Input
 {
     public class PlayerInputController : MonoBehaviour

@@ -1,5 +1,6 @@
 using UnityEngine;
 
+
 namespace Ninja.Core {
     public static class ComponentExtensions {
         public static T GetOrAddComponent<T>(this Component component) where T : Component {

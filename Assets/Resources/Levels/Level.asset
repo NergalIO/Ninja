@@ -12,5 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30ca10c72de1be44f84fe9a6aaa61bf9, type: 3}
   m_Name: Level
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Levels.Level
-  id: 1
+  id: Test
   levelName: Test
+  description: Testing level

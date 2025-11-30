@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 6680245542512537389}
   - component: {fileID: 3584422684912602350}
   - component: {fileID: 2351314371435096328}
-  - component: {fileID: 3314314138652936498}
   m_Layer: 0
   m_Name: InputSystem
   m_TagString: Untagged
@@ -48,7 +47,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.InputSystem.MouseInputController
   inputController: {fileID: 2351314371435096328}
-  uiInputController: {fileID: 3314314138652936498}
+  uiInputController: {fileID: 0}
 --- !u!114 &3584422684912602350
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -73,18 +72,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a140498d3a7b99418eb2f40b2cabd09, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.InputSystem.InputController
---- !u!114 &3314314138652936498
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 924499713287226960}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fb68afb4137b4e24d9c19fb1d1ee0b3b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Ninja.InGame.UI.UIInputController
 --- !u!1 &3406261285952449502
 GameObject:
   m_ObjectHideFlags: 0
@@ -95,7 +82,6 @@ GameObject:
   m_Component:
   - component: {fileID: 647076845276568180}
   - component: {fileID: 7282979212160062182}
-  - component: {fileID: 8104344814967134826}
   - component: {fileID: 6825480219068780235}
   - component: {fileID: 1482464602458766081}
   m_Layer: 0
@@ -140,21 +126,6 @@ MonoBehaviour:
   defaultSpeed: 200
   crouchSpeed: 50
   sprintSpeed: 350
---- !u!114 &8104344814967134826
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3406261285952449502}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fccb78a44664f044880d02b68c9f7bc6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Player.NoiseController
-  controller: {fileID: 7282979212160062182}
-  noiseArea: {fileID: 5506335263501405340}
-  defaultNoise: 1
 --- !u!50 &6825480219068780235
 Rigidbody2D:
   serializedVersion: 5
@@ -228,6 +199,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3984073493991197427}
   - component: {fileID: 5506335263501405340}
+  - component: {fileID: 6363447458094721210}
   m_Layer: 0
   m_Name: Noise Area
   m_TagString: Untagged
@@ -286,6 +258,21 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.5
+--- !u!114 &6363447458094721210
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5386235335809729285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fccb78a44664f044880d02b68c9f7bc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Player.NoiseController
+  controller: {fileID: 7282979212160062182}
+  noiseArea: {fileID: 5506335263501405340}
+  defaultNoise: 1
 --- !u!1 &8518458485645843067
 GameObject:
   m_ObjectHideFlags: 0

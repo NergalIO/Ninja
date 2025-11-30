@@ -1,7 +1,8 @@
 using UnityEngine;
-using Ninja.Utils;
 using Keyboard;
 using UnityEngine.InputSystem;
+
+
 namespace Ninja.Input
 {
     [RequireComponent(typeof(MouseInputController), typeof(PlayerInputController))]
@@ -9,7 +10,6 @@ namespace Ninja.Input
     {
         private KeyboardBinds _inputActions;
 
-        // Player inputs
         public Vector2 Move { get; private set; }
         public Vector2 Look { get; private set; }
         public bool Interact { get; private set; }

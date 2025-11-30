@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33cb6fa023f50c849a96087b270dbb71, type: 3}
+  m_Name: Backgrounds
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.UI.Loading.Backgrounds
+  backgrounds:
+  - {fileID: 8710572203945503448, guid: 65a7b2b52ac13644c853774732c8e1bc, type: 3}
+  - {fileID: -4588344645579149168, guid: ff296194e58ef4d4fa9501f433256ab0, type: 3}
+  - {fileID: 2500068948174635291, guid: 1e533c64234e28a49b94eb22120b6a9e, type: 3}
+  - {fileID: -285757285010370514, guid: 4da19532fbe77be489d733357c252f8a, type: 3}
+  - {fileID: 2626247952208728542, guid: ff0f1f218abc56c42a1d65de8e8bb8c8, type: 3}
+  - {fileID: -4320295261928297051, guid: 93aab5e7a62373443ad6cee127358307, type: 3}
+  - {fileID: 2888427252096979072, guid: bd303446a24320d4da3292b14aae683b, type: 3}
+  - {fileID: -4921670324858160243, guid: 89ebff597fbf0bd4485acccb9e300a48, type: 3}

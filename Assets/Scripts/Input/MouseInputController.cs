@@ -1,5 +1,8 @@
 using UnityEngine;
-using Ninja.InGame.UI;
+
+using Ninja.Input;
+
+
 namespace Ninja.Input
 {
     public class MouseInputController : MonoBehaviour

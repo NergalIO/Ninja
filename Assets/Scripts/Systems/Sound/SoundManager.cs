@@ -1,23 +1,22 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using Ninja.Utils;
+using Ninja.Systems.Settings;
+using Ninja.Core;
 using UnityEngine;
+using Unity.VisualScripting;
+
 namespace Ninja.Audio {
     public class SoundManager : PersistentSingleton<SoundManager> {
         private const string MusicSourceName = "Music Source";
 
-        private static class PrefKeys {
+        private static class SettingKeys {
             public const string GlobalVolume = "sound_global_volume";
             public const string MusicVolume = "sound_music_volume";
             public const string SfxVolume = "sound_sfx_volume";
             public const string MuteAll = "sound_mute_all";
             public const string MuteMusic = "sound_mute_music";
             public const string MuteSfx = "sound_mute_sfx";
-
-            public const string RuntimeMusicVolume = "sound_runtime_music_volume";
-            public const string RuntimeSfxVolume = "sound_runtime_sfx_volume";
-            public const string RuntimeMusicMute = "sound_runtime_music_mute";
-            public const string RuntimeSfxMute = "sound_runtime_sfx_mute";
         }
 
         [Serializable]
@@ -40,6 +39,7 @@ namespace Ninja.Audio {
         [SerializeField] private SoundSource musicSource;
         [SerializeField] private Transform dynamicSourcesRoot;
         [SerializeField] private int maxSFXSources = 16;
+        [SerializeField] private bool debugMode = true;
 
         [Header("Music Playlist")]
         [SerializeField] private bool autoPlayRandomMusic = false;
@@ -62,94 +62,189 @@ namespace Ninja.Audio {
         private int lastRandomMusicIndex = -1;
         private bool requestNextRandomTrack;
 
+        private SettingsManager settingsManager;
+
         public IReadOnlyDictionary<string, AudioClip> MusicClips => musicClips;
         public IReadOnlyDictionary<string, AudioClip> SfxClips => sfxClips;
 
         protected override void OnSingletonInitialized() {
             base.OnSingletonInitialized();
+            
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Initializing SoundManager...");
+            }
+
             dynamicSourcesRoot ??= transform;
+            settingsManager = SettingsManager.Instance;
+            
             LoadClipsFromResources();
             BuildClipDictionaries();
-            LoadSettings();
+            LoadSettingsFromManager();
             InitializeMusicSource();
-            ApplySettingsToRuntimeSources(savePreferences: true);
+            RegisterSettingsCallbacks();
+            ApplySettingsToRuntimeSources();
 
             if (autoPlayRandomMusic) {
                 StartRandomMusicPlaylist();
             }
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Initialization complete");
+            }
+        }
+
+        protected override void OnDestroy()
+        {
+            UnregisterSettingsCallbacks();
+            base.OnDestroy();
         }
 
         private void LateUpdate() {
             CleanupFinishedSfxSources();
         }
 
+        #region Settings Management
+
+        private void LoadSettingsFromManager()
+        {
+            if (settingsManager == null)
+            {
+                Debug.LogWarning("[SoundManager] SettingsManager is not initialized. Waiting for initialization...");
+                StartCoroutine(WaitForSettingsManager());
+                return;
+            }
+
+            globalVolume = settingsManager.GetSettingValue<float>(SettingKeys.GlobalVolume);
+            musicVolume = settingsManager.GetSettingValue<float>(SettingKeys.MusicVolume);
+            sfxVolume = settingsManager.GetSettingValue<float>(SettingKeys.SfxVolume);
+            muteAll = settingsManager.GetSettingValue<bool>(SettingKeys.MuteAll);
+            muteMusic = settingsManager.GetSettingValue<bool>(SettingKeys.MuteMusic);
+            muteSFX = settingsManager.GetSettingValue<bool>(SettingKeys.MuteSfx);
+
+            if (debugMode)
+            {
+                Debug.Log($"[SoundManager] Loaded settings - Global: {globalVolume}, Music: {musicVolume}, SFX: {sfxVolume}");
+            }
+            ApplySettingsToRuntimeSources();
+        }
+
+        private IEnumerator WaitForSettingsManager()
+        {
+            while (SettingsManager.Instance == null)
+                yield return null;
+
+            settingsManager = SettingsManager.Instance;
+            LoadSettingsFromManager();
+            RegisterSettingsCallbacks();
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void RegisterSettingsCallbacks()
+        {
+            if (settingsManager == null) return;
+
+            settingsManager.RegisterAction<float>(SettingKeys.GlobalVolume, OnGlobalVolumeChanged);
+            settingsManager.RegisterAction<float>(SettingKeys.MusicVolume, OnMusicVolumeChanged);
+            settingsManager.RegisterAction<float>(SettingKeys.SfxVolume, OnSfxVolumeChanged);
+            settingsManager.RegisterAction<bool>(SettingKeys.MuteAll, OnMuteAllChanged);
+            settingsManager.RegisterAction<bool>(SettingKeys.MuteMusic, OnMuteMusicChanged);
+            settingsManager.RegisterAction<bool>(SettingKeys.MuteSfx, OnMuteSfxChanged);
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Registered all settings callbacks");
+            }
+        }
+
+        private void UnregisterSettingsCallbacks()
+        {
+            // Примечание: Если нужна отписка, добавьте список зарегистрированных callbacks
+            // и удаляйте их здесь
+        }
+
+        private void OnGlobalVolumeChanged(float newValue)
+        {
+            globalVolume = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] Global volume changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void OnMusicVolumeChanged(float newValue)
+        {
+            musicVolume = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] Music volume changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void OnSfxVolumeChanged(float newValue)
+        {
+            sfxVolume = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] SFX volume changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void OnMuteAllChanged(bool newValue)
+        {
+            muteAll = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] Mute all changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void OnMuteMusicChanged(bool newValue)
+        {
+            muteMusic = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] Mute music changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        private void OnMuteSfxChanged(bool newValue)
+        {
+            muteSFX = newValue;
+            if (debugMode) Debug.Log($"[SoundManager] Mute SFX changed: {newValue}");
+            ApplySettingsToRuntimeSources();
+        }
+
+        #endregion
+
         #region Public API
 
         public void SetGlobalVolume(float value) {
             value = Mathf.Clamp01(value);
-            if (Mathf.Approximately(globalVolume, value)) {
-                return;
-            }
-
-            globalVolume = value;
-            PlayerPrefs.SetFloat(PrefKeys.GlobalVolume, globalVolume);
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.GlobalVolume, value);
         }
 
         public void SetMusicVolume(float value) {
             value = Mathf.Clamp01(value);
-            if (Mathf.Approximately(musicVolume, value)) {
-                return;
-            }
-
-            musicVolume = value;
-            PlayerPrefs.SetFloat(PrefKeys.MusicVolume, musicVolume);
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.MusicVolume, value);
         }
 
         public void SetSfxVolume(float value) {
             value = Mathf.Clamp01(value);
-            if (Mathf.Approximately(sfxVolume, value)) {
-                return;
-            }
-
-            sfxVolume = value;
-            PlayerPrefs.SetFloat(PrefKeys.SfxVolume, sfxVolume);
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.SfxVolume, value);
         }
 
         public void SetMuteAll(bool muted) {
-            if (muteAll == muted) {
-                return;
-            }
-
-            muteAll = muted;
-            PlayerPrefs.SetInt(PrefKeys.MuteAll, BoolToInt(muteAll));
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.MuteAll, muted);
         }
 
         public void SetMuteMusic(bool muted) {
-            if (muteMusic == muted) {
-                return;
-            }
-
-            muteMusic = muted;
-            PlayerPrefs.SetInt(PrefKeys.MuteMusic, BoolToInt(muteMusic));
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.MuteMusic, muted);
         }
 
         public void SetMuteSfx(bool muted) {
-            if (muteSFX == muted) {
-                return;
-            }
-
-            muteSFX = muted;
-            PlayerPrefs.SetInt(PrefKeys.MuteSfx, BoolToInt(muteSFX));
-            ApplySettingsToRuntimeSources();
+            settingsManager.SetSettingValue(SettingKeys.MuteSfx, muted);
         }
 
+        public float GetGlobalVolume() => settingsManager.GetSettingValue<float>(SettingKeys.GlobalVolume);
+        public float GetMusicVolume() => settingsManager.GetSettingValue<float>(SettingKeys.MusicVolume);
+        public float GetSfxVolume() => settingsManager.GetSettingValue<float>(SettingKeys.SfxVolume);
+        public bool GetMuteAll() => settingsManager.GetSettingValue<bool>(SettingKeys.MuteAll);
+        public bool GetMuteMusic() => settingsManager.GetSettingValue<bool>(SettingKeys.MuteMusic);
+        public bool GetMuteSfx() => settingsManager.GetSettingValue<bool>(SettingKeys.MuteSfx);
+
         public bool PlayMusic(string clipId, bool restartIfSame = false) {
-            // Останавливаем случайный плейлист, если запуск музыки происходит вручную
             StopRandomMusicPlaylist(stopCurrent: false);
 
             if (!musicClips.TryGetValue(clipId, out var clip) || clip == null) {
@@ -168,6 +263,12 @@ namespace Ninja.Audio {
             audio.loop = true;
             audio.playOnAwake = false;
             audio.Play();
+
+            if (debugMode)
+            {
+                Debug.Log($"[SoundManager] Playing music: '{clipId}'");
+            }
+
             return true;
         }
 
@@ -182,13 +283,15 @@ namespace Ninja.Audio {
             }
 
             audio.Stop();
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Music stopped");
+            }
+
             return true;
         }
 
-        /// <summary>
-        /// Пропускает текущий трек и переходит к следующему случайному с плавным переходом.
-        /// Если плейлист ещё не запущен – просто запускает его.
-        /// </summary>
         public void SkipToNextRandomTrack() {
             if (!musicPlaylistActive) {
                 StartRandomMusicPlaylist();
@@ -200,11 +303,13 @@ namespace Ninja.Audio {
             }
 
             requestNextRandomTrack = true;
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Skipping to next random track");
+            }
         }
 
-        /// <summary>
-        /// Запускает бесконечный случайный плейлист музыки с плавными переходами между треками.
-        /// </summary>
         public void StartRandomMusicPlaylist() {
             if (musicClips.Count == 0) {
                 Debug.LogWarning("[SoundManager] Cannot start random music playlist: music library is empty.");
@@ -219,11 +324,13 @@ namespace Ninja.Audio {
 
             musicPlaylistActive = true;
             musicPlaylistCoroutine = StartCoroutine(RandomMusicPlaylistCoroutine());
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Random music playlist started");
+            }
         }
 
-        /// <summary>
-        /// Останавливает случайный плейлист. Опционально глушит текущий трек.
-        /// </summary>
         public void StopRandomMusicPlaylist(bool stopCurrent = true) {
             if (!musicPlaylistActive && musicPlaylistCoroutine == null) {
                 return;
@@ -241,6 +348,11 @@ namespace Ninja.Audio {
 
             var audio = musicSource.AudioSource;
             audio.Stop();
+
+            if (debugMode)
+            {
+                Debug.Log("[SoundManager] Random music playlist stopped");
+            }
         }
 
         public SoundSource PlaySfx(string clipId, Vector3 position, float spatialBlend = 0f) {
@@ -266,6 +378,12 @@ namespace Ninja.Audio {
             audio.playOnAwake = false;
             audio.spatialBlend = Mathf.Clamp01(spatialBlend);
             audio.Play();
+
+            if (debugMode)
+            {
+                Debug.Log($"[SoundManager] Playing SFX: '{clipId}' at position {position}");
+            }
+
             return sfxSource;
         }
 
@@ -285,19 +403,18 @@ namespace Ninja.Audio {
             var sfxResources = Resources.LoadAll<AudioClip>("Sounds/SFX");
 
             foreach (var clip in musicResources) {
-                if (clip == null) {
-                    continue;
-                }
-
+                if (clip == null) continue;
                 musicLibrary.Add(new ClipEntry { id = clip.name, clip = clip });
             }
 
             foreach (var clip in sfxResources) {
-                if (clip == null) {
-                    continue;
-                }
-
+                if (clip == null) continue;
                 sfxLibrary.Add(new ClipEntry { id = clip.name, clip = clip });
+            }
+
+            if (debugMode)
+            {
+                Debug.Log($"[SoundManager] Loaded {musicResources.Length} music clips and {sfxResources.Length} SFX clips");
             }
         }
 
@@ -307,33 +424,17 @@ namespace Ninja.Audio {
             musicKeys.Clear();
 
             foreach (var entry in musicLibrary) {
-                if (entry.clip == null) {
-                    continue;
-                }
-
+                if (entry.clip == null) continue;
                 var key = string.IsNullOrWhiteSpace(entry.id) ? entry.clip.name : entry.id;
                 musicClips[key] = entry.clip;
                 musicKeys.Add(key);
             }
 
             foreach (var entry in sfxLibrary) {
-                if (entry.clip == null) {
-                    continue;
-                }
-
+                if (entry.clip == null) continue;
                 var key = string.IsNullOrWhiteSpace(entry.id) ? entry.clip.name : entry.id;
                 sfxClips[key] = entry.clip;
             }
-        }
-
-        private void LoadSettings() {
-            globalVolume = PlayerPrefs.GetFloat(PrefKeys.GlobalVolume, Mathf.Clamp01(globalVolume));
-            musicVolume = PlayerPrefs.GetFloat(PrefKeys.MusicVolume, Mathf.Clamp01(musicVolume));
-            sfxVolume = PlayerPrefs.GetFloat(PrefKeys.SfxVolume, Mathf.Clamp01(sfxVolume));
-
-            muteAll = PlayerPrefs.GetInt(PrefKeys.MuteAll, BoolToInt(muteAll)) == 1;
-            muteMusic = PlayerPrefs.GetInt(PrefKeys.MuteMusic, BoolToInt(muteMusic)) == 1;
-            muteSFX = PlayerPrefs.GetInt(PrefKeys.MuteSfx, BoolToInt(muteSFX)) == 1;
         }
 
         private void InitializeMusicSource() {
@@ -352,9 +453,13 @@ namespace Ninja.Audio {
                 var go = new GameObject(MusicSourceName);
                 go.transform.SetParent(transform);
                 musicSource = go.AddComponent<SoundSource>();
+
+                if (debugMode)
+                {
+                    Debug.Log("[SoundManager] Created new music source");
+                }
             }
 
-            musicSource.ConfigurePlayerPrefKeys(PrefKeys.RuntimeMusicVolume, PrefKeys.RuntimeMusicMute);
             musicSource.SetDestroyOnClipEnd(false);
             var audio = musicSource.AudioSource;
             audio.loop = true;
@@ -367,7 +472,6 @@ namespace Ninja.Audio {
             go.transform.position = position;
 
             var source = go.AddComponent<SoundSource>();
-            source.ConfigurePlayerPrefKeys(PrefKeys.RuntimeSfxVolume, PrefKeys.RuntimeSfxMute);
             source.SetDestroyOnClipEnd(true);
             activeSfxSources.Add(source);
             return source;
@@ -377,29 +481,28 @@ namespace Ninja.Audio {
 
         #region Helpers
 
-        private void ApplySettingsToRuntimeSources(bool savePreferences = true) {
+        private void ApplySettingsToRuntimeSources() {
             var musicMuted = muteAll || muteMusic;
             var sfxMuted = muteAll || muteSFX;
 
             var resolvedMusicVolume = musicMuted ? 0f : globalVolume * musicVolume;
             var resolvedSfxVolume = sfxMuted ? 0f : globalVolume * sfxVolume;
 
-            PlayerPrefs.SetFloat(PrefKeys.RuntimeMusicVolume, resolvedMusicVolume);
-            PlayerPrefs.SetFloat(PrefKeys.RuntimeSfxVolume, resolvedSfxVolume);
-            PlayerPrefs.SetInt(PrefKeys.RuntimeMusicMute, BoolToInt(musicMuted));
-            PlayerPrefs.SetInt(PrefKeys.RuntimeSfxMute, BoolToInt(sfxMuted));
-
-            if (savePreferences) {
-                PlayerPrefs.Save();
+            musicSource?.SetVolume(resolvedMusicVolume);
+            musicSource?.SetMute(musicMuted);
+            
+            foreach (var source in activeSfxSources) {
+                source?.SetVolume(resolvedSfxVolume);
+                source?.SetMute(sfxMuted);
             }
 
-            musicSource?.ForceSync();
-            foreach (var source in activeSfxSources) {
-                source?.ForceSync();
+            if (debugMode)
+            {
+                Debug.Log($"[SoundManager] Applied settings - Music Volume: {resolvedMusicVolume}, SFX Volume: {resolvedSfxVolume}");
             }
         }
 
-        private System.Collections.IEnumerator RandomMusicPlaylistCoroutine() {
+        private IEnumerator RandomMusicPlaylistCoroutine() {
             if (musicSource == null) {
                 yield break;
             }
@@ -408,12 +511,10 @@ namespace Ninja.Audio {
             audio.loop = false;
             audio.playOnAwake = false;
 
-            // Обновляем список доступных ключей на случай, если библиотека изменилась
             if (musicKeys.Count == 0) {
                 yield break;
             }
 
-            // Основной цикл плейлиста
             while (musicPlaylistActive) {
                 if (musicKeys.Count == 0) {
                     yield break;
@@ -423,7 +524,6 @@ namespace Ninja.Audio {
                 if (musicKeys.Count == 1) {
                     index = 0;
                 } else {
-                    // Не повторяем один и тот же трек подряд
                     do {
                         index = musicRandom.Next(musicKeys.Count);
                     } while (index == lastRandomMusicIndex && musicKeys.Count > 1);
@@ -437,15 +537,12 @@ namespace Ninja.Audio {
                     continue;
                 }
 
-                // Плавно переходим к следующему треку
                 yield return FadeToClipCoroutine(clip, musicFadeDuration);
 
                 if (!musicPlaylistActive) {
                     yield break;
                 }
 
-                // Ждём почти до конца трека, оставляя время на затухание.
-                // При запросе следующего трека выходим раньше и сразу переходим к следующему.
                 var waitTime = Mathf.Max(0f, clip.length - musicFadeDuration);
                 var elapsed = 0f;
                 while (musicPlaylistActive && elapsed < waitTime && audio.clip == clip && audio.isPlaying && !requestNextRandomTrack) {
@@ -480,7 +577,7 @@ namespace Ninja.Audio {
             }
         }
 
-        private System.Collections.IEnumerator FadeToClipCoroutine(AudioClip newClip, float fadeDuration) {
+        private IEnumerator FadeToClipCoroutine(AudioClip newClip, float fadeDuration) {
             if (musicSource == null) {
                 yield break;
             }
@@ -488,7 +585,6 @@ namespace Ninja.Audio {
             var audio = musicSource.AudioSource;
             var initialVolume = audio.volume;
 
-            // Затухание текущего трека
             if (audio.isPlaying && audio.clip != null && fadeDuration > 0f) {
                 var t = 0f;
                 while (t < fadeDuration) {
@@ -511,7 +607,6 @@ namespace Ninja.Audio {
                 yield break;
             }
 
-            // Включаем новый трек с нарастанием громкости
             audio.volume = 0f;
             audio.Play();
 
@@ -542,8 +637,6 @@ namespace Ninja.Audio {
                 }
             }
         }
-
-        private static int BoolToInt(bool value) => value ? 1 : 0;
 
         #endregion
     }

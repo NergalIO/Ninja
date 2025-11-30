@@ -9,16 +9,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9034027b3874ff64fa5eff705916d002, type: 3}
+  m_Script: {fileID: 11500000, guid: f561d72e5215772488312919ab4be2fe, type: 3}
   m_Name: MusicVolume
-  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Settings.GameSetting
-  settingName: Music
-  displayText: 
-  dataType: 0
-  minValue: 0
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Systems.Settings.SettingsObject
+  settingKey: sound_music_volume
+  settingName: Music Volume
+  group: Volume
+  valueType: 2
+  defaultValue: 1
+  currentValue: 1
   maxValue: 1
-  defaultValueFloat: 0
-  defaultValueInt: 0
-  defaultValueBool: 0
-  defaultValueString: 
-  playerPrefsKey: 
+  minValue: 0
+  debugMode: 1

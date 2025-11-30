@@ -1,6 +1,10 @@
 using System;
-using Ninja.Utils;
+
 using UnityEngine;
+
+using Ninja.Core;
+
+
 namespace Ninja.Systems {
     public class GameManager : PersistentSingleton<GameManager> {
         [Header("Pause Settings")]

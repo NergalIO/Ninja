@@ -1,5 +1,8 @@
-using Ninja.InGame.InputSystem;
 using UnityEngine;
+
+using Ninja.Input;
+
+
 namespace Ninja.Gameplay.Player
 {
     public class MovementController : MonoBehaviour

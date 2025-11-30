@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
+
 using UnityEngine;
+
 using Ninja.Systems.Loader;
-using Ninja.Core;
+using Ninja.UI.Loading;
 
 
 namespace Ninja.Gameplay.Levels
@@ -11,7 +13,7 @@ namespace Ninja.Gameplay.Levels
     {
         [SerializeField] private List<Level> levels = new();
 
-        public List<Level> Levels => levels;
+        public IReadOnlyCollection<Level> Levels => levels;
 
         public void Awake()
         {
@@ -42,7 +44,7 @@ namespace Ninja.Gameplay.Levels
             Level level;
             if (TryGetLevel(levelId, out level))
             {
-                AsyncSceneLoader.Instance.LoadScene(level.LevelName);
+                AsyncSceneLoader.Instance.LoadSceneAsyncWithProgress(level.LevelName, LoadingUI.Instance.OnSceneLoadProgress);
             }
         }
     }

@@ -1,7 +1,10 @@
 using UnityEngine;
-using Ninja.Utils;
 using Keyboard;
 using UnityEngine.InputSystem;
+
+using Ninja.Core;
+
+
 namespace Ninja.Input
 {
     public class UIInputController : PersistentSingleton<UIInputController>, KeyboardBinds.IUIActions

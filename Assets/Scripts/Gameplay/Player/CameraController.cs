@@ -1,4 +1,6 @@
 using UnityEngine;
+
+
 namespace Ninja.Gameplay.Player
 {
     public class CameraController : MonoBehaviour
