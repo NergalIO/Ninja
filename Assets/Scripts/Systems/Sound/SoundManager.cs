@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using Ninja.Systems.Settings;
 using Ninja.Core;
 using UnityEngine;
-using Unity.VisualScripting;
 
 namespace Ninja.Audio {
     public class SoundManager : PersistentSingleton<SoundManager> {
