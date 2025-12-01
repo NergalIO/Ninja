@@ -10,6 +10,7 @@ namespace Ninja.Gameplay.Enemy
 
         [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
+        [SerializeField] private float rotationSpeed = 5f;
 
         [Header("Player")]
         [SerializeField] private Transform player;
@@ -36,6 +37,11 @@ namespace Ninja.Gameplay.Enemy
 
         private void Awake()
         {
+            if (agent != null)
+            {
+                agent.updateRotation = false;
+            }
+
             if (fieldOfView != null && player != null)
             {
                 fieldOfView.SetTarget(player);
@@ -45,6 +51,7 @@ namespace Ninja.Gameplay.Enemy
         private void FixedUpdate()
         {
             CheckForPlayer();
+            RotateTowardsMovement();
 
             switch (currentState)
             {
@@ -68,6 +75,39 @@ namespace Ninja.Gameplay.Enemy
             if (fieldOfView != null && fieldOfView.CanSeeTarget)
             {
                 OnPlayerDetected();
+            }
+        }
+        #endregion
+
+        #region Rotation
+        private void RotateTowardsMovement()
+        {
+            if (agent == null)
+                return;
+
+            // Use desiredVelocity to get the direction agent wants to move
+            Vector3 direction = agent.desiredVelocity;
+
+            // Only rotate if agent has a valid path and direction
+            if (direction.magnitude > 0.1f)
+            {
+                // For 2D rotation around Z axis, use X and Y components
+                // In 2D top-down view, movement is typically in X-Y plane
+                // Calculate angle in 2D plane (X-Y) for rotation around Z axis
+                float targetAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                
+                // Get current Z rotation
+                float currentAngle = transform.eulerAngles.z;
+                
+                // Normalize angles to -180 to 180 range for smooth rotation
+                float angleDifference = Mathf.DeltaAngle(currentAngle, targetAngle);
+                
+                // Smoothly rotate towards target angle
+                float newAngle = currentAngle + angleDifference * rotationSpeed * Time.fixedDeltaTime;
+                
+                // Apply rotation only on Z axis, preserve X and Y rotation
+                Vector3 currentEuler = transform.eulerAngles;
+                transform.rotation = Quaternion.Euler(currentEuler.x, currentEuler.y, newAngle);
             }
         }
         #endregion

@@ -43,7 +43,7 @@ namespace Ninja.Input
             _inputActions.Enable();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
             if (_inputActions != null)
             {

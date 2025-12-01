@@ -14,7 +14,7 @@ namespace Ninja.Systems.Settings
         [SerializeField] private bool debugMode = true;
         
         private Dictionary<string, SettingsObject> settingsObjects = new Dictionary<string, SettingsObject>();
-        private Dictionary<string, List<System.Action<object>>> actionCallbacks = new Dictionary<string, List<System.Action<object>>>();
+        private Dictionary<string, List<Action<object>>> actionCallbacks = new Dictionary<string, List<System.Action<object>>>();
 
         protected override void OnSingletonInitialized()
         {
