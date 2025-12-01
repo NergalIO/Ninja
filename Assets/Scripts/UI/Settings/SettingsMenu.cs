@@ -3,7 +3,6 @@ using Ninja.Input;
 using Ninja.Systems.Settings;
 using UnityEngine;
 
-
 namespace Ninja.UI.Menu
 {
     public class SettingsMenu : MenuBase
@@ -17,20 +16,23 @@ namespace Ninja.UI.Menu
         [Header("Variables")]
         [SerializeField] private List<SettingsGroup> settingsGroups = new();
 
-        public void OnEnable()
+        private void OnEnable()
         {
+            UIController.Instance.FocusMenu(this);
             Refresh();
         }
 
-        public void OnDisable()
+        private void OnDisable()
         {
             Clear();
+            UIController.Instance.UnfocusMenu(this);
         }
 
-        public void Refresh()
+        private void Refresh()
         {
             Clear();
             SettingsManager.Instance.GetAllSettings(out List<SettingsObject> settingsObjects);
+
             foreach (SettingsObject localSettingsObject in settingsObjects)
             {
                 SettingsGroup group = GetOrCreateSettingsGroup(localSettingsObject.Group);
@@ -38,14 +40,12 @@ namespace Ninja.UI.Menu
             }
         }
 
-        public SettingsGroup GetOrCreateSettingsGroup(string groupName)
+        private SettingsGroup GetOrCreateSettingsGroup(string groupName)
         {
             foreach (SettingsGroup group in settingsGroups)
             {
                 if (group.GroupName == groupName)
-                {
                     return group;
-                }
             }
 
             GameObject groupObj = Instantiate(settingsGroupPrefab, container);
@@ -55,13 +55,20 @@ namespace Ninja.UI.Menu
             return newGroup;
         }
 
-        public void Clear()
+        private void Clear()
         {
             foreach (SettingsGroup card in settingsGroups)
-            {
                 Destroy(card.gameObject);
-            }
+
             settingsGroups.Clear();
+        }
+
+        public override void OnEscPressed()
+        {
+            if (!IsFocused)
+                return;
+
+            Close();
         }
     }
 }

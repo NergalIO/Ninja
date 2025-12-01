@@ -23,7 +23,6 @@ namespace Ninja.UI.Menu
 
             playButton.onClick.RemoveAllListeners();
             playButton.onClick.AddListener(() => {
-                Debug.Log($"Starting level: {level.LevelName}");
                 AsyncSceneLoader.Instance.LoadSceneAsyncWithProgress(level.Id, LoadingUI.Instance.OnSceneLoadProgress);
             });
         }

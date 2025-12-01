@@ -1,54 +1,49 @@
-using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+
 namespace Ninja.Gameplay.Enemy
 {
     public class EnemyController : MonoBehaviour
     {
-        [Header("Navigation Preferences")]
+        [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
 
         [Header("Player")]
-        [SerializeField] private Transform playerPosition;
+        [SerializeField] private Transform player;
 
-        [Header("Speed Preferences")]
-        [SerializeField] private float patrolSpeed = 2f;
-        [SerializeField] private float shaseSpeed = 4f;
-
-        [Header("Patrol Preferences")]
+        [Header("Patrol")]
         [SerializeField] private Transform[] patrolPoints;
-        [SerializeField] private int currentPoint = 0;
-        [SerializeField] private float viewDistance = 6f;
-        [SerializeField] private float radius;
-        [SerializeField] private float angle;
-        [SerializeField] private float waitAtPoint = 2f;
-        [SerializeField] private float waitTimer = 0f;
+        private int currentPoint = 0;
+        [SerializeField] private float patrolSpeed = 2f;
 
-        [Header("Layer Masks")]
+        [Header("Chase")]
+        [SerializeField] private float chaseSpeed = 4f;
+        [SerializeField] private float loseTargetTime = 3f;
+        private float lastSeenTarget;
+
+        [Header("View Settings")]
+        [SerializeField] private FieldOfView fov;
+        [SerializeField] private float viewRadius = 6f;
+        [SerializeField] private float viewAngle = 60f;
         [SerializeField] private LayerMask targetMask;
         [SerializeField] private LayerMask obstructionMask;
 
-        [Header("Chase Preferences")]
-        [SerializeField] private GameObject foundTarget;
-        [SerializeField] private float loseTargetTime = 3f;
-        [SerializeField] private float lastSeenTarget;
-
-        [Header("Seach Preferences")]
-        [SerializeField] private Transform[] searchPoints;
+        [Header("Search")]
         [SerializeField] private float timeToForgetTarget = 5f;
-        [SerializeField] private float startedSeachingTime;
+        private float startedSearchingTime;
 
         private EnemyState state = EnemyState.Patrol;
-        private Coroutine ForgotenAfterCoroutine;
+        private Coroutine forgetCoroutine;
 
-        public void Awake()
+        private void Awake()
         {
             targetMask = LayerMask.GetMask("Target");
             obstructionMask = LayerMask.GetMask("Obstruction");
+            fov.player = player;
         }
 
-        public void FixedUpdate()
+        private void FixedUpdate()
         {
             switch (state)
             {
@@ -56,9 +51,12 @@ namespace Ninja.Gameplay.Enemy
                     Patrol();
                     LookForPlayer();
                     break;
+
                 case EnemyState.Chase:
                     ChasePlayer();
+                    LookForPlayer();
                     break;
+
                 case EnemyState.Search:
                     SearchPlayer();
                     LookForPlayer();
@@ -66,92 +64,116 @@ namespace Ninja.Gameplay.Enemy
             }
         }
 
+        #region Patrol
         private void Patrol()
         {
             agent.speed = patrolSpeed;
 
+            if (patrolPoints.Length == 0)
+                return;
+
             if (!agent.pathPending && agent.remainingDistance < 0.25f)
             {
-                waitTimer += Time.deltaTime;
-
-                if (waitTimer >= waitAtPoint)
-                {
-                    GoToNextPatrolPoint();
-                    waitTimer = 0f;
-                }
+                GoToNextPatrolPoint();
             }
         }
 
         private void GoToNextPatrolPoint()
         {
-            if (patrolPoints.Length == 0)
-                return;
-            
             agent.destination = patrolPoints[currentPoint].position;
             currentPoint = (currentPoint + 1) % patrolPoints.Length;
         }
+        #endregion
 
+        #region Vision
+        /// <summary>
+        /// Проверяет, находится ли игрок в зоне FOV.
+        /// </summary>
+        private void LookForPlayer()
+        {
+            if (fov.canSeePlayer)
+                OnFoundPlayer();
+            return;
+
+            if (player == null) return;
+
+            Vector3 dirToPlayer = (player.position - transform.position).normalized;
+
+            if (Vector3.Distance(transform.position, player.position) > viewRadius)
+                return;
+
+            if (Vector3.Angle(transform.forward, dirToPlayer) > viewAngle / 2f)
+                return;
+
+            if (Physics.Raycast(transform.position, dirToPlayer, out RaycastHit hit, viewRadius))
+            {
+                if (((1 << hit.collider.gameObject.layer) & obstructionMask) != 0)
+                    return;
+            }
+
+            OnFoundPlayer();
+        }
+        #endregion
+
+        #region Chase
+        private void ChasePlayer()
+        {
+            if (player == null) return;
+
+            agent.speed = chaseSpeed;
+            agent.destination = player.position;
+        }
+
+        private void OnFoundPlayer()
+        {
+            if (state != EnemyState.Chase)
+            {
+                state = EnemyState.Chase;
+                agent.speed = chaseSpeed;
+            }
+
+            lastSeenTarget = Time.time;
+
+            if (forgetCoroutine != null)
+                StopCoroutine(forgetCoroutine);
+
+            forgetCoroutine = StartCoroutine(ForgetPlayerAfterDelay());
+        }
+
+        private IEnumerator ForgetPlayerAfterDelay()
+        {
+            while (Time.time - lastSeenTarget < loseTargetTime)
+                yield return null;
+
+            state = EnemyState.Search;
+            startedSearchingTime = Time.time;
+            forgetCoroutine = null;
+        }
+        #endregion
+
+        #region Noise Reaction
+
+        private void OnTriggerEnter2D(Collider2D collider)
+        {
+            if (collider.CompareTag("NoiseArea"))
+            {
+                OnFoundPlayer();
+            }
+        }
+
+        #endregion
+
+        #region Search
         private void SearchPlayer()
         {
             agent.speed = patrolSpeed;
 
-            if (Time.fixedTime - lastSeenTarget > loseTargetTime)
+            if (Time.time - startedSearchingTime > timeToForgetTarget)
             {
                 state = EnemyState.Patrol;
                 GoToNextPatrolPoint();
             }
-            LookForPlayer();
         }
-
-        private void LookForPlayer()
-        {
-            Collider2D[] rangeChecks = Physics2D.OverlapCircleAll(transform.position, radius, targetMask);
-            foreach (var check in rangeChecks)
-            {
-                Debug.Log(check);
-            }
-            //OnFoundTarget();
-        }
-
-        private void ChasePlayer()
-        {
-            foundTarget = playerPosition.gameObject;
-            agent.destination = foundTarget.transform.position;
-        }
-
-        private void OnFoundTarget()
-        {
-            state = EnemyState.Chase;
-            agent.speed = shaseSpeed;
-            agent.destination = foundTarget.transform.position;
-            lastSeenTarget = Time.fixedTime;
-        }
-
-        private IEnumerator ForgotenAfter()
-        {
-            while (Time.fixedTime - lastSeenTarget < loseTargetTime)
-            {
-                yield return null;
-            }
-            foundTarget = null;
-            state = EnemyState.Patrol;
-            ForgotenAfterCoroutine = null;
-        }
-
-        private void OnTriggerEnter2D(Collider2D collision)
-        {
-            if (collision.CompareTag("NoiseArea"))
-            {
-                foundTarget = collision.gameObject;
-                OnFoundTarget();
-                StartCoroutine(ForgotenAfter());
-            }
-        }
-
-        private void OnDrawGizmos()
-        {
-            Gizmos.color = Color.white;
-            Gizmos.DrawWireSphere(transform.position, radius);
-        }
+        #endregion
     }
 }

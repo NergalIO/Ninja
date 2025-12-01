@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using Ninja.Gameplay.Levels;
 using UnityEngine;
 
-
 namespace Ninja.UI.Menu
 {
     public class PlayMenu : MenuBase
@@ -17,19 +16,22 @@ namespace Ninja.UI.Menu
 
         public IReadOnlyCollection<LevelWidget> Levels => levelWidgets;
 
-        public void OnEnable()
+        private void OnEnable()
         {
-            Refresh();            
+            Refresh();
+            UIController.Instance.FocusMenu(this);
         }
 
-        public void OnDisable()
+        private void OnDisable()
         {
             Clear();
+            UIController.Instance.UnfocusMenu(this);
         }
 
         private void Refresh()
         {
             Clear();
+
             foreach (Level level in levelController.Levels)
             {
                 GameObject widgetObj = Instantiate(levelWidgetPrefab, container);
@@ -46,6 +48,14 @@ namespace Ninja.UI.Menu
                 Destroy(widget.gameObject);
             }
             levelWidgets.Clear();
+        }
+
+        public override void OnEscPressed()
+        {
+            if (!IsFocused)
+                return;
+
+            Close();
         }
     }
 }

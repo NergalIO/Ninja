@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-
 namespace Ninja.UI.Menu
 {
     public class MenuUI : MonoBehaviour
@@ -16,7 +15,7 @@ namespace Ninja.UI.Menu
         [SerializeField] private Button settingsButton;
         [SerializeField] private Button quitButton;
 
-        public void Start()
+        private void Start()
         {
             playButton.onClick.AddListener(() => OpenMenu(playMenu));
             settingsButton.onClick.AddListener(() => OpenMenu(settingsMenu));
@@ -25,22 +24,23 @@ namespace Ninja.UI.Menu
             CloseAllMenus();
         }
 
-        public void OpenMenu(MenuBase menuToOpen)
+        private void OpenMenu(MenuBase menuToOpen)
         {
-            CloseAllMenus();
             menuToOpen.Open();
+            UIController.Instance.FocusMenu(menuToOpen);
         }
 
-        public void CloseMenu(MenuBase menuToClose)
+        private void CloseMenu(MenuBase menuToClose)
         {
             menuToClose.Close();
+            UIController.Instance.UnfocusMenu(menuToClose);
         }
 
-        public void CloseAllMenus()
+        private void CloseAllMenus()
         {
-            playMenu.Close();
-            settingsMenu.Close();
-            quitMenu.Close();
+            CloseMenu(playMenu);
+            CloseMenu(settingsMenu);
+            CloseMenu(quitMenu);
         }
     }
 }

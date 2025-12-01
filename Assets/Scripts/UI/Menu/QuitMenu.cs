@@ -3,7 +3,6 @@ using Ninja.UI.Loading;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 namespace Ninja.UI.Menu
 {
     public class QuitMenu : MenuBase
@@ -23,6 +22,9 @@ namespace Ninja.UI.Menu
 
         private void OnConfirmQuit()
         {
+            if (!IsFocused)
+                return;
+
             if (isApplicationQuit)
             {
                 Debug.Log("Quitting the game...");
@@ -30,12 +32,26 @@ namespace Ninja.UI.Menu
             }
             else
             {
-                AsyncSceneLoader.Instance.LoadSceneAsyncWithProgress("Menu", LoadingUI.Instance.OnSceneLoadProgress);
+                AsyncSceneLoader.Instance.LoadSceneAsyncWithProgress(
+                    "Menu",
+                    LoadingUI.Instance.OnSceneLoadProgress
+                );
             }
         }
 
         private void OnCancelQuit()
         {
+            if (!IsFocused)
+                return;
+
+            Close();
+        }
+
+        public override void OnEscPressed()
+        {
+            if (!IsFocused)
+                return;
+
             Close();
         }
     }

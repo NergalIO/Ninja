@@ -14,7 +14,6 @@ namespace Ninja.Systems.Loader
     public class AsyncSceneLoader : PersistentSingleton<AsyncSceneLoader>
     {
         [Header("References")]
-        [SerializeField] private LoadingUI loadingUI;
 
         [Header("Current State")]
         [SerializeField] private LoaderStates currentState = LoaderStates.Idle;
