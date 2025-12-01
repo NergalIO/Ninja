@@ -75,6 +75,9 @@ crashlytics-build.properties
 [Aa]ssets/[Ss]treamingAssets/aa.meta
 [Aa]ssets/[Ss]treamingAssets/aa/*
 
+# Large audio files (use Git LFS if needed)
+Assets/Resources/Sounds/Music/OST-2.wav
+
 ### macOS ###
 # General
 .DS_Store
