@@ -8,6 +8,7 @@ TagManager:
   - Shadow
   - ViewZone
   - NoiseArea
+  - WinZone
   layers:
   - Default
   - TransparentFX

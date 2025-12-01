@@ -1,13 +1,14 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+using Ninja.Systems;
 
 namespace Ninja.Gameplay.Enemy
 {
     public class EnemyController : MonoBehaviour
     {
-        private const float PATROL_DISTANCE_THRESHOLD = 0.25f;
-
+        [Header("State Machine")]
+        [SerializeField] private EnemyState state;
+        
         [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
         [SerializeField] private float rotationSpeed = 5f;
@@ -18,25 +19,45 @@ namespace Ninja.Gameplay.Enemy
         [Header("Patrol")]
         [SerializeField] private Transform[] patrolPoints;
         [SerializeField] private float patrolSpeed = 2f;
-        private int currentPatrolPointIndex = 0;
+        [SerializeField] private float waitTimeAtPatrolPoint = 0.75f;
 
         [Header("Chase")]
         [SerializeField] private float chaseSpeed = 4f;
         [SerializeField] private float loseTargetTime = 3f;
-        private float lastSeenTargetTime;
 
         [Header("View Settings")]
         [SerializeField] private FieldOfView fieldOfView;
 
         [Header("Search")]
         [SerializeField] private float timeToForgetTarget = 5f;
-        private float searchStartTime;
 
-        private EnemyState currentState = EnemyState.Patrol;
-        private Coroutine forgetTargetCoroutine;
+        [Header("Investigate")]
+        [SerializeField] private float investigateSpeed = 3f;
+
+        [Header("Scan")]
+        [SerializeField] private float scanDuration = 3f;
+
+        [Header("Return")]
+        [SerializeField] private float returnSpeed = 2f;
+
+        private EnemyStateContext context;
+        private EnemyStateBase currentState;
+        private EnemyState currentStateType = EnemyState.Patrol;
+        private bool playerCaughtTriggered = false;
+
+        // State instances
+        private PatrolState patrolState;
+        private ChaseState chaseState;
+        private SearchState searchState;
+        private InvestigateState investigateState;
+        private ScanState scanState;
+        private ReturnState returnState;
 
         private void Awake()
         {
+            InitializeContext();
+            InitializeStates();
+            
             if (agent != null)
             {
                 agent.updateRotation = false;
@@ -46,27 +67,62 @@ namespace Ninja.Gameplay.Enemy
             {
                 fieldOfView.SetTarget(player);
             }
+
+            ChangeState(EnemyState.Patrol);
+        }
+
+        private void InitializeContext()
+        {
+            context = new EnemyStateContext
+            {
+                Agent = agent,
+                RotationSpeed = rotationSpeed,
+                Transform = transform,
+                Player = player,
+                PatrolPoints = patrolPoints,
+                PatrolSpeed = patrolSpeed,
+                CurrentPatrolPointIndex = 0,
+                WaitTimeAtPatrolPoint = waitTimeAtPatrolPoint,
+                ChaseSpeed = chaseSpeed,
+                LoseTargetTime = loseTargetTime,
+                FieldOfView = fieldOfView,
+                TimeToForgetTarget = timeToForgetTarget,
+                InvestigateSpeed = investigateSpeed,
+                ScanDuration = scanDuration,
+                ReturnSpeed = returnSpeed,
+                CoroutineRunner = this,
+                OnStateChange = ChangeState,
+                GetCurrentState = () => currentStateType,
+                OnPlayerDetected = OnPlayerDetected,
+                MoveToNextPatrolPoint = MoveToNextPatrolPoint
+            };
+        }
+
+        private void MoveToNextPatrolPoint()
+        {
+            if (patrolPoints == null || patrolPoints.Length == 0)
+                return;
+
+            context.CurrentPatrolPointIndex = (context.CurrentPatrolPointIndex + 1) % patrolPoints.Length;
+            agent.destination = patrolPoints[context.CurrentPatrolPointIndex].position;
+        }
+
+        private void InitializeStates()
+        {
+            patrolState = new PatrolState(context);
+            chaseState = new ChaseState(context);
+            searchState = new SearchState(context);
+            investigateState = new InvestigateState(context);
+            scanState = new ScanState(context);
+            returnState = new ReturnState(context);
         }
 
         private void FixedUpdate()
         {
             CheckForPlayer();
             RotateTowardsMovement();
-
-            switch (currentState)
-            {
-                case EnemyState.Patrol:
-                    HandlePatrol();
-                    break;
-
-                case EnemyState.Chase:
-                    HandleChase();
-                    break;
-
-                case EnemyState.Search:
-                    HandleSearch();
-                    break;
-            }
+            CheckPlayerCatch();
+            currentState?.Update();
         }
 
         #region Vision
@@ -85,106 +141,17 @@ namespace Ninja.Gameplay.Enemy
             if (agent == null)
                 return;
 
-            // Use desiredVelocity to get the direction agent wants to move
             Vector3 direction = agent.desiredVelocity;
 
-            // Only rotate if agent has a valid path and direction
             if (direction.magnitude > 0.1f)
             {
-                // For 2D rotation around Z axis, use X and Y components
-                // In 2D top-down view, movement is typically in X-Y plane
-                // Calculate angle in 2D plane (X-Y) for rotation around Z axis
                 float targetAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-                
-                // Get current Z rotation
                 float currentAngle = transform.eulerAngles.z;
-                
-                // Normalize angles to -180 to 180 range for smooth rotation
                 float angleDifference = Mathf.DeltaAngle(currentAngle, targetAngle);
-                
-                // Smoothly rotate towards target angle
                 float newAngle = currentAngle + angleDifference * rotationSpeed * Time.fixedDeltaTime;
                 
-                // Apply rotation only on Z axis, preserve X and Y rotation
                 Vector3 currentEuler = transform.eulerAngles;
                 transform.rotation = Quaternion.Euler(currentEuler.x, currentEuler.y, newAngle);
-            }
-        }
-        #endregion
-
-        #region Patrol
-        private void HandlePatrol()
-        {
-            agent.speed = patrolSpeed;
-
-            if (patrolPoints == null || patrolPoints.Length == 0)
-                return;
-
-            if (!agent.pathPending && agent.remainingDistance < PATROL_DISTANCE_THRESHOLD)
-            {
-                MoveToNextPatrolPoint();
-            }
-        }
-
-        private void MoveToNextPatrolPoint()
-        {
-            if (patrolPoints == null || patrolPoints.Length == 0)
-                return;
-
-            agent.destination = patrolPoints[currentPatrolPointIndex].position;
-            currentPatrolPointIndex = (currentPatrolPointIndex + 1) % patrolPoints.Length;
-        }
-        #endregion
-
-        #region Chase
-        private void HandleChase()
-        {
-            if (player == null)
-                return;
-
-            agent.speed = chaseSpeed;
-            agent.destination = player.position;
-        }
-
-        private void OnPlayerDetected()
-        {
-            if (currentState != EnemyState.Chase)
-            {
-                ChangeState(EnemyState.Chase);
-            }
-
-            lastSeenTargetTime = Time.time;
-
-            if (forgetTargetCoroutine != null)
-            {
-                StopCoroutine(forgetTargetCoroutine);
-            }
-
-            forgetTargetCoroutine = StartCoroutine(ForgetTargetAfterDelay());
-        }
-
-        private IEnumerator ForgetTargetAfterDelay()
-        {
-            while (Time.time - lastSeenTargetTime < loseTargetTime)
-            {
-                yield return null;
-            }
-
-            ChangeState(EnemyState.Search);
-            searchStartTime = Time.time;
-            forgetTargetCoroutine = null;
-        }
-        #endregion
-
-        #region Search
-        private void HandleSearch()
-        {
-            agent.speed = patrolSpeed;
-
-            if (Time.time - searchStartTime > timeToForgetTarget)
-            {
-                ChangeState(EnemyState.Patrol);
-                MoveToNextPatrolPoint();
             }
         }
         #endregion
@@ -194,29 +161,94 @@ namespace Ninja.Gameplay.Enemy
         {
             if (collider.CompareTag("NoiseArea"))
             {
-                OnPlayerDetected();
+                OnNoiseDetected(collider.transform.position);
             }
+        }
+
+        private void OnNoiseDetected(Vector3 noisePos)
+        {
+            // Уведомляем GameManager о том, что игрок был услышан
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.NotifyPlayerHeard(noisePos);
+            }
+
+            // Если уже в погоне, не переключаемся на исследование
+            if (currentStateType == EnemyState.Chase)
+            {
+                OnPlayerDetected();
+                return;
+            }
+
+            context.NoisePosition = noisePos;
+            context.HasNoisePosition = true;
+            ChangeState(EnemyState.Investigate);
         }
         #endregion
 
         #region State Management
-        private void ChangeState(EnemyState newState)
+        private void OnPlayerDetected()
         {
-            if (currentState == newState)
+            if (currentStateType != EnemyState.Chase)
+            {
+                // Уведомляем GameManager о том, что игрок был обнаружен
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.NotifyPlayerFound();
+                }
+
+                ChangeState(EnemyState.Chase);
+            }
+        }
+
+        private void CheckPlayerCatch()
+        {
+            if (playerCaughtTriggered)
                 return;
 
-            currentState = newState;
+            float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+            if (distanceToPlayer < 1.2f)
+            {
+                playerCaughtTriggered = true;
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.NotifyPlayerCatched();
+                }
+            }
+        }
+
+        private void ChangeState(EnemyState newState)
+        {
+            if (currentStateType == newState)
+                return;
+
+            currentState?.Exit();
+            currentStateType = newState;
 
             switch (newState)
             {
-                case EnemyState.Chase:
-                    agent.speed = chaseSpeed;
-                    break;
                 case EnemyState.Patrol:
+                    currentState = patrolState;
+                    break;
+                case EnemyState.Chase:
+                    currentState = chaseState;
+                    break;
                 case EnemyState.Search:
-                    agent.speed = patrolSpeed;
+                    currentState = searchState;
+                    break;
+                case EnemyState.Investigate:
+                    currentState = investigateState;
+                    break;
+                case EnemyState.Scan:
+                    currentState = scanState;
+                    break;
+                case EnemyState.Return:
+                    currentState = returnState;
                     break;
             }
+
+            state = newState;
+            currentState?.Enter();
         }
         #endregion
     }

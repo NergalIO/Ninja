@@ -35,6 +35,8 @@ namespace Ninja.UI.Menu
 
             foreach (SettingsObject localSettingsObject in settingsObjects)
             {
+                if (localSettingsObject.IsHiden)
+                    continue;
                 SettingsGroup group = GetOrCreateSettingsGroup(localSettingsObject.Group);
                 group.AddSettingObject(localSettingsObject);
             }
