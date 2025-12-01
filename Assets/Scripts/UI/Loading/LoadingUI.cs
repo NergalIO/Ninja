@@ -3,6 +3,7 @@ using UnityEngine;
 using Ninja.Systems.Loader;
 using Ninja.Core;
 using System.Collections;
+using Ninja.Systems;
 
 
 namespace Ninja.UI.Loading
@@ -60,6 +61,8 @@ namespace Ninja.UI.Loading
 
         private void HandleSceneLoadCompleted()
         {
+            if (GameManager.Instance.IsPaused)
+                GameManager.Instance.TogglePause();
             loadingPanelInstance.Close();
             Destroy(loadingPanelInstance.gameObject);
         }

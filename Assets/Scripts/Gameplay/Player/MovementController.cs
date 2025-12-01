@@ -1,6 +1,7 @@
 using UnityEngine;
 
 using Ninja.Input;
+using Ninja.Systems;
 
 
 namespace Ninja.Gameplay.Player
@@ -85,6 +86,9 @@ namespace Ninja.Gameplay.Player
             
             transform.rotation = Quaternion.Euler(0f, 0f, newAngle);
         }
+
+        // WinZone теперь обрабатывается через скрипт WinZone на самом объекте WinZone
+        // Это предотвращает ложные срабатывания от дочерних объектов игрока (например, NoiseArea)
     }
 }
 

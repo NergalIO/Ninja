@@ -19,6 +19,7 @@ namespace Ninja.Systems.Settings
         [SerializeField] private string settingKey;
         [SerializeField] private string settingName;
         [SerializeField] private string group;
+        [SerializeField] private bool isHiden;
 
         [Header("Value Settings")]
         [SerializeField] private ValueType valueType = ValueType.String;
@@ -33,6 +34,7 @@ namespace Ninja.Systems.Settings
         public string SettingKey => settingKey;
         public string SettingName => settingName;
         public string Group => group;
+        public bool IsHiden => isHiden;
         public ValueType Type => valueType;
         public float MaxValue => maxValue;
         public float MinValue => minValue;

@@ -4,6 +4,9 @@ namespace Ninja.Gameplay.Enemy
     {
         Patrol,
         Chase,
-        Search
+        Search,
+        Investigate,
+        Scan,
+        Return
     }
 }
