@@ -6,172 +6,216 @@ namespace Ninja.Gameplay.Enemy
 {
     public class EnemyController : MonoBehaviour
     {
+        private const float PATROL_DISTANCE_THRESHOLD = 0.25f;
+
         [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
+        [SerializeField] private float rotationSpeed = 5f;
 
         [Header("Player")]
         [SerializeField] private Transform player;
 
         [Header("Patrol")]
         [SerializeField] private Transform[] patrolPoints;
-        private int currentPoint = 0;
         [SerializeField] private float patrolSpeed = 2f;
+        private int currentPatrolPointIndex = 0;
 
         [Header("Chase")]
         [SerializeField] private float chaseSpeed = 4f;
         [SerializeField] private float loseTargetTime = 3f;
-        private float lastSeenTarget;
+        private float lastSeenTargetTime;
 
         [Header("View Settings")]
-        [SerializeField] private FieldOfView fov;
-        [SerializeField] private float viewRadius = 6f;
-        [SerializeField] private float viewAngle = 60f;
-        [SerializeField] private LayerMask targetMask;
-        [SerializeField] private LayerMask obstructionMask;
+        [SerializeField] private FieldOfView fieldOfView;
 
         [Header("Search")]
         [SerializeField] private float timeToForgetTarget = 5f;
-        private float startedSearchingTime;
+        private float searchStartTime;
 
-        private EnemyState state = EnemyState.Patrol;
-        private Coroutine forgetCoroutine;
+        private EnemyState currentState = EnemyState.Patrol;
+        private Coroutine forgetTargetCoroutine;
 
         private void Awake()
         {
-            targetMask = LayerMask.GetMask("Target");
-            obstructionMask = LayerMask.GetMask("Obstruction");
-            fov.player = player;
+            if (agent != null)
+            {
+                agent.updateRotation = false;
+            }
+
+            if (fieldOfView != null && player != null)
+            {
+                fieldOfView.SetTarget(player);
+            }
         }
 
         private void FixedUpdate()
         {
-            switch (state)
+            CheckForPlayer();
+            RotateTowardsMovement();
+
+            switch (currentState)
             {
                 case EnemyState.Patrol:
-                    Patrol();
-                    LookForPlayer();
+                    HandlePatrol();
                     break;
 
                 case EnemyState.Chase:
-                    ChasePlayer();
-                    LookForPlayer();
+                    HandleChase();
                     break;
 
                 case EnemyState.Search:
-                    SearchPlayer();
-                    LookForPlayer();
+                    HandleSearch();
                     break;
             }
         }
 
-        #region Patrol
-        private void Patrol()
+        #region Vision
+        private void CheckForPlayer()
         {
-            agent.speed = patrolSpeed;
-
-            if (patrolPoints.Length == 0)
-                return;
-
-            if (!agent.pathPending && agent.remainingDistance < 0.25f)
+            if (fieldOfView != null && fieldOfView.CanSeeTarget)
             {
-                GoToNextPatrolPoint();
+                OnPlayerDetected();
             }
-        }
-
-        private void GoToNextPatrolPoint()
-        {
-            agent.destination = patrolPoints[currentPoint].position;
-            currentPoint = (currentPoint + 1) % patrolPoints.Length;
         }
         #endregion
 
-        #region Vision
-        /// <summary>
-        /// Проверяет, находится ли игрок в зоне FOV.
-        /// </summary>
-        private void LookForPlayer()
+        #region Rotation
+        private void RotateTowardsMovement()
         {
-            if (fov.canSeePlayer)
-                OnFoundPlayer();
-            return;
-
-            if (player == null) return;
-
-            Vector3 dirToPlayer = (player.position - transform.position).normalized;
-
-            if (Vector3.Distance(transform.position, player.position) > viewRadius)
+            if (agent == null)
                 return;
 
-            if (Vector3.Angle(transform.forward, dirToPlayer) > viewAngle / 2f)
-                return;
+            // Use desiredVelocity to get the direction agent wants to move
+            Vector3 direction = agent.desiredVelocity;
 
-            if (Physics.Raycast(transform.position, dirToPlayer, out RaycastHit hit, viewRadius))
+            // Only rotate if agent has a valid path and direction
+            if (direction.magnitude > 0.1f)
             {
-                if (((1 << hit.collider.gameObject.layer) & obstructionMask) != 0)
-                    return;
+                // For 2D rotation around Z axis, use X and Y components
+                // In 2D top-down view, movement is typically in X-Y plane
+                // Calculate angle in 2D plane (X-Y) for rotation around Z axis
+                float targetAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                
+                // Get current Z rotation
+                float currentAngle = transform.eulerAngles.z;
+                
+                // Normalize angles to -180 to 180 range for smooth rotation
+                float angleDifference = Mathf.DeltaAngle(currentAngle, targetAngle);
+                
+                // Smoothly rotate towards target angle
+                float newAngle = currentAngle + angleDifference * rotationSpeed * Time.fixedDeltaTime;
+                
+                // Apply rotation only on Z axis, preserve X and Y rotation
+                Vector3 currentEuler = transform.eulerAngles;
+                transform.rotation = Quaternion.Euler(currentEuler.x, currentEuler.y, newAngle);
             }
+        }
+        #endregion
 
-            OnFoundPlayer();
+        #region Patrol
+        private void HandlePatrol()
+        {
+            agent.speed = patrolSpeed;
+
+            if (patrolPoints == null || patrolPoints.Length == 0)
+                return;
+
+            if (!agent.pathPending && agent.remainingDistance < PATROL_DISTANCE_THRESHOLD)
+            {
+                MoveToNextPatrolPoint();
+            }
+        }
+
+        private void MoveToNextPatrolPoint()
+        {
+            if (patrolPoints == null || patrolPoints.Length == 0)
+                return;
+
+            agent.destination = patrolPoints[currentPatrolPointIndex].position;
+            currentPatrolPointIndex = (currentPatrolPointIndex + 1) % patrolPoints.Length;
         }
         #endregion
 
         #region Chase
-        private void ChasePlayer()
+        private void HandleChase()
         {
-            if (player == null) return;
+            if (player == null)
+                return;
 
             agent.speed = chaseSpeed;
             agent.destination = player.position;
         }
 
-        private void OnFoundPlayer()
+        private void OnPlayerDetected()
         {
-            if (state != EnemyState.Chase)
+            if (currentState != EnemyState.Chase)
             {
-                state = EnemyState.Chase;
-                agent.speed = chaseSpeed;
+                ChangeState(EnemyState.Chase);
             }
 
-            lastSeenTarget = Time.time;
+            lastSeenTargetTime = Time.time;
 
-            if (forgetCoroutine != null)
-                StopCoroutine(forgetCoroutine);
+            if (forgetTargetCoroutine != null)
+            {
+                StopCoroutine(forgetTargetCoroutine);
+            }
 
-            forgetCoroutine = StartCoroutine(ForgetPlayerAfterDelay());
+            forgetTargetCoroutine = StartCoroutine(ForgetTargetAfterDelay());
         }
 
-        private IEnumerator ForgetPlayerAfterDelay()
+        private IEnumerator ForgetTargetAfterDelay()
         {
-            while (Time.time - lastSeenTarget < loseTargetTime)
+            while (Time.time - lastSeenTargetTime < loseTargetTime)
+            {
                 yield return null;
+            }
 
-            state = EnemyState.Search;
-            startedSearchingTime = Time.time;
-            forgetCoroutine = null;
+            ChangeState(EnemyState.Search);
+            searchStartTime = Time.time;
+            forgetTargetCoroutine = null;
+        }
+        #endregion
+
+        #region Search
+        private void HandleSearch()
+        {
+            agent.speed = patrolSpeed;
+
+            if (Time.time - searchStartTime > timeToForgetTarget)
+            {
+                ChangeState(EnemyState.Patrol);
+                MoveToNextPatrolPoint();
+            }
         }
         #endregion
 
         #region Noise Reaction
-
         private void OnTriggerEnter2D(Collider2D collider)
         {
             if (collider.CompareTag("NoiseArea"))
             {
-                OnFoundPlayer();
+                OnPlayerDetected();
             }
         }
-
         #endregion
 
-        #region Search
-        private void SearchPlayer()
+        #region State Management
+        private void ChangeState(EnemyState newState)
         {
-            agent.speed = patrolSpeed;
+            if (currentState == newState)
+                return;
 
-            if (Time.time - startedSearchingTime > timeToForgetTarget)
+            currentState = newState;
+
+            switch (newState)
             {
-                state = EnemyState.Patrol;
-                GoToNextPatrolPoint();
+                case EnemyState.Chase:
+                    agent.speed = chaseSpeed;
+                    break;
+                case EnemyState.Patrol:
+                case EnemyState.Search:
+                    agent.speed = patrolSpeed;
+                    break;
             }
         }
         #endregion

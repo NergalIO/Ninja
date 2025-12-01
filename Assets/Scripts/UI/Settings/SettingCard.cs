@@ -3,7 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 namespace Ninja.UI.Menu
 {
     public class SettingCard : MonoBehaviour
@@ -14,56 +13,122 @@ namespace Ninja.UI.Menu
         [SerializeField] private Slider slider;
 
         private SettingsObject settingsObject;
+        private bool isInitialized = false;
 
-        public void OnEnable()
+        private void OnEnable()
         {
-            toggle.onValueChanged.AddListener((value) => OnTogleValueChanged());
-            slider.onValueChanged.AddListener((value) => OnSliderValueChanged());
+            if (isInitialized)
+            {
+                RefreshUI();
+            }
         }
 
-        public void OnDisable()
+        private void OnDisable()
         {
-            toggle.onValueChanged.RemoveAllListeners();
-            slider.onValueChanged.RemoveAllListeners();
+            RemoveListeners();
         }
 
-        public void OnTogleValueChanged()
+        private void OnDestroy()
         {
-            SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, toggle.isOn);
-        }
-
-        public void OnSliderValueChanged()
-        {
-            SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, slider.value);
+            RemoveListeners();
         }
 
         public void SetObject(SettingsObject settingsObject)
         {
             this.settingsObject = settingsObject;
             settingNameText.text = settingsObject.SettingName;
+            
+            RemoveListeners();
+            SetupUI();
+            isInitialized = true;
+        }
+
+        private void SetupUI()
+        {
             switch (settingsObject.Type)
             {
                 case SettingsObject.ValueType.Bool:
-                    toggle.gameObject.SetActive(true);
-                    slider.gameObject.SetActive(false);
-                    bool boolValue = SettingsManager.Instance.GetSettingValue<bool>(settingsObject.SettingKey);
-                    toggle.isOn = boolValue;
-                    toggle.onValueChanged.AddListener((value) => {
-                        SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, value);
-                    });
+                    SetupToggle();
                     break;
 
                 case SettingsObject.ValueType.Float:
-                    toggle.gameObject.SetActive(false);
-                    slider.gameObject.SetActive(true);
-                    float floatValue = SettingsManager.Instance.GetSettingValue<float>(settingsObject.SettingKey);
-                    slider.value = floatValue;
-                    slider.maxValue = settingsObject.MaxValue;
-                    slider.minValue = settingsObject.MinValue;
-                    slider.onValueChanged.AddListener((value) => {
-                        SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, value);
-                    });
+                    SetupSlider();
                     break;
+
+                default:
+                    toggle.gameObject.SetActive(false);
+                    slider.gameObject.SetActive(false);
+                    break;
+            }
+        }
+
+        private void SetupToggle()
+        {
+            toggle.gameObject.SetActive(true);
+            slider.gameObject.SetActive(false);
+            
+            bool boolValue = SettingsManager.Instance.GetSettingValue<bool>(settingsObject.SettingKey);
+            toggle.SetIsOnWithoutNotify(boolValue);
+            toggle.onValueChanged.AddListener(OnToggleValueChanged);
+        }
+
+        private void SetupSlider()
+        {
+            toggle.gameObject.SetActive(false);
+            slider.gameObject.SetActive(true);
+            
+            float floatValue = SettingsManager.Instance.GetSettingValue<float>(settingsObject.SettingKey);
+            slider.minValue = settingsObject.MinValue;
+            slider.maxValue = settingsObject.MaxValue;
+            slider.SetValueWithoutNotify(floatValue);
+            slider.onValueChanged.AddListener(OnSliderValueChanged);
+        }
+
+        private void RefreshUI()
+        {
+            if (settingsObject == null)
+                return;
+
+            switch (settingsObject.Type)
+            {
+                case SettingsObject.ValueType.Bool:
+                    bool boolValue = SettingsManager.Instance.GetSettingValue<bool>(settingsObject.SettingKey);
+                    toggle.SetIsOnWithoutNotify(boolValue);
+                    break;
+
+                case SettingsObject.ValueType.Float:
+                    float floatValue = SettingsManager.Instance.GetSettingValue<float>(settingsObject.SettingKey);
+                    slider.SetValueWithoutNotify(floatValue);
+                    break;
+            }
+        }
+
+        private void OnToggleValueChanged(bool value)
+        {
+            if (settingsObject != null)
+            {
+                SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, value);
+            }
+        }
+
+        private void OnSliderValueChanged(float value)
+        {
+            if (settingsObject != null)
+            {
+                SettingsManager.Instance.SetSettingValue(settingsObject.SettingKey, value);
+            }
+        }
+
+        private void RemoveListeners()
+        {
+            if (toggle != null)
+            {
+                toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
+            }
+
+            if (slider != null)
+            {
+                slider.onValueChanged.RemoveListener(OnSliderValueChanged);
             }
         }
     }

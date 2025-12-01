@@ -31,7 +31,7 @@ namespace Ninja.UI.Menu
         private void Refresh()
         {
             Clear();
-            SettingsManager.Instance.GetAllSettings(out List<SettingsObject> settingsObjects);
+            List<SettingsObject> settingsObjects = SettingsManager.Instance.GetAllSettings();
 
             foreach (SettingsObject localSettingsObject in settingsObjects)
             {

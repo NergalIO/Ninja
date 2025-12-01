@@ -22,12 +22,12 @@ namespace Ninja.UI.Menu
 
         public string GroupName => groupName;
 
-        public void OnEnable()
+        private void OnEnable()
         {
             Refresh();
         }
 
-        public void OnDisable()
+        private void OnDisable()
         {
             Clear();
         }
