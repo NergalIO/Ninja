@@ -256,6 +256,7 @@ namespace Ninja.Audio {
 
             var audio = musicSource.AudioSource;
             if (!restartIfSame && audio.isPlaying && audio.clip == clip) {
+                ApplySettingsToRuntimeSources();
                 return true;
             }
 
@@ -263,6 +264,8 @@ namespace Ninja.Audio {
             audio.loop = true;
             audio.playOnAwake = false;
             audio.Play();
+
+            ApplySettingsToRuntimeSources();
 
             if (debugMode)
             {
@@ -582,8 +585,11 @@ namespace Ninja.Audio {
                 yield break;
             }
 
+            ApplySettingsToRuntimeSources();
+
             var audio = musicSource.AudioSource;
-            var initialVolume = audio.volume;
+            var musicMuted = muteAll || muteMusic;
+            var resolvedMusicVolume = musicMuted ? 0f : globalVolume * musicVolume;
 
             if (audio.isPlaying && audio.clip != null && fadeDuration > 0f) {
                 var t = 0f;
@@ -594,7 +600,7 @@ namespace Ninja.Audio {
 
                     t += Time.deltaTime;
                     var k = Mathf.Clamp01(t / fadeDuration);
-                    audio.volume = Mathf.Lerp(initialVolume, 0f, k);
+                    audio.volume = Mathf.Lerp(resolvedMusicVolume, 0f, k);
                     yield return null;
                 }
             }
@@ -611,7 +617,7 @@ namespace Ninja.Audio {
             audio.Play();
 
             if (fadeDuration <= 0f) {
-                audio.volume = initialVolume;
+                ApplySettingsToRuntimeSources();
                 yield break;
             }
 
@@ -623,11 +629,11 @@ namespace Ninja.Audio {
 
                 tFadeIn += Time.deltaTime;
                 var k = Mathf.Clamp01(tFadeIn / fadeDuration);
-                audio.volume = Mathf.Lerp(0f, initialVolume, k);
+                audio.volume = Mathf.Lerp(0f, resolvedMusicVolume, k);
                 yield return null;
             }
 
-            audio.volume = initialVolume;
+            ApplySettingsToRuntimeSources();
         }
 
         private void CleanupFinishedSfxSources() {

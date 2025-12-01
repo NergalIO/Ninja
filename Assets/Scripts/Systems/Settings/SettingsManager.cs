@@ -1,11 +1,7 @@
-using System.Linq;
-using System.Collections.Generic;
-
-using UnityEngine;
-
-using Ninja.Core;
 using System;
-
+using System.Collections.Generic;
+using UnityEngine;
+using Ninja.Core;
 
 namespace Ninja.Systems.Settings
 {
@@ -13,15 +9,12 @@ namespace Ninja.Systems.Settings
     {
         [SerializeField] private bool debugMode = true;
         
-        private Dictionary<string, SettingsObject> settingsObjects = new Dictionary<string, SettingsObject>();
-        private Dictionary<string, List<Action<object>>> actionCallbacks = new Dictionary<string, List<System.Action<object>>>();
+        private readonly Dictionary<string, SettingsObject> settingsObjects = new Dictionary<string, SettingsObject>();
+        private readonly Dictionary<string, List<Action<object>>> actionCallbacks = new Dictionary<string, List<Action<object>>>();
 
         protected override void OnSingletonInitialized()
         {
-            if (debugMode)
-            {
-                Debug.Log("[SettingsManager] Initializing SettingsManager...");
-            }
+            LogDebug("Initializing SettingsManager...");
             LoadSettingsObjects();
         }
 
@@ -30,17 +23,13 @@ namespace Ninja.Systems.Settings
         private void LoadSettingsObjects()
         {
             var loadedSettings = Resources.LoadAll<SettingsObject>("Settings");
-            
-            if (debugMode)
-            {
-                Debug.Log($"[SettingsManager] Loading {loadedSettings.Length} SettingsObjects from Resources/Settings");
-            }
+            LogDebug($"Loading {loadedSettings.Length} SettingsObjects from Resources/Settings");
 
             foreach (var settingsObject in loadedSettings)
             {
                 if (settingsObject == null)
                 {
-                    Debug.LogError("[SettingsManager] Attempted to load a null SettingsObject.");
+                    LogError("Attempted to load a null SettingsObject.");
                     continue;
                 }
 
@@ -48,23 +37,17 @@ namespace Ninja.Systems.Settings
                 settingsObject.LoadFromPlayerPrefs();
                 settingsObjects[settingsObject.SettingKey] = settingsObject;
 
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Loaded setting: '{settingsObject.SettingKey}' = '{settingsObject.GetValue()}' (Type: {settingsObject.Type})");
-                }
+                LogDebug($"Loaded setting: '{settingsObject.SettingKey}' = '{settingsObject.GetValue()}' (Type: {settingsObject.Type})");
             }
 
-            if (debugMode)
-            {
-                Debug.Log($"[SettingsManager] Successfully loaded {settingsObjects.Count} settings");
-            }
+            LogDebug($"Successfully loaded {settingsObjects.Count} settings");
         }
 
         private SettingsObject GetSettingsObject(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
             {
-                Debug.LogError("[SettingsManager] Attempted to get SettingsObject with null or empty key.");
+                LogError("Attempted to get SettingsObject with null or empty key.");
                 return null;
             }
 
@@ -73,7 +56,7 @@ namespace Ninja.Systems.Settings
                 return settingsObject;
             }
 
-            Debug.LogWarning($"[SettingsManager] No SettingsObject found with key '{key}'.");
+            LogWarning($"No SettingsObject found with key '{key}'.");
             return null;
         }
 
@@ -81,16 +64,12 @@ namespace Ninja.Systems.Settings
         {
             if (settingsObject == null)
             {
-                Debug.LogError("[SettingsManager] Attempted to change value of a null SettingsObject.");
+                LogError("Attempted to change value of a null SettingsObject.");
                 return;
             }
 
-            if (debugMode)
-            {
-                Debug.Log($"[SettingsManager] Setting changed: '{settingsObject.SettingKey}' = '{newValue}' (Type: {settingsObject.Type})");
-            }
+            LogDebug($"Setting changed: '{settingsObject.SettingKey}' = '{newValue}' (Type: {settingsObject.Type})");
 
-            // Вызываем зарегистрированные callbacks
             if (actionCallbacks.TryGetValue(settingsObject.SettingKey, out var callbacks))
             {
                 foreach (var callback in callbacks)
@@ -99,218 +78,237 @@ namespace Ninja.Systems.Settings
                     {
                         callback?.Invoke(newValue);
                     }
-                    catch (System.Exception ex)
+                    catch (Exception ex)
                     {
-                        Debug.LogError($"[SettingsManager] Error invoking callback for '{settingsObject.SettingKey}': {ex.Message}");
+                        LogError($"Error invoking callback for '{settingsObject.SettingKey}': {ex.Message}");
                     }
                 }
             }
+        }
+
+        private void LogDebug(string message)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[SettingsManager] {message}");
+            }
+        }
+
+        private void LogWarning(string message)
+        {
+            Debug.LogWarning($"[SettingsManager] {message}");
+        }
+
+        private void LogError(string message)
+        {
+            Debug.LogError($"[SettingsManager] {message}");
         }
 
         #endregion
 
         #region Public Methods
 
-        public void RegisterAction(string key, System.Action action)
+        public void RegisterAction(string key, Action action)
         {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                Debug.LogError("[SettingsManager] Attempted to register action with null or empty key.");
+            if (!ValidateKey(key) || !ValidateAction(action, key))
                 return;
-            }
-
-            if (action == null)
-            {
-                Debug.LogError($"[SettingsManager] Attempted to register null action for key '{key}'.");
-                return;
-            }
 
             var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
+            if (settingsObject == null)
             {
-                if (!actionCallbacks.ContainsKey(key))
-                {
-                    actionCallbacks[key] = new List<System.Action<object>>();
-                }
-
-                actionCallbacks[key].Add(value => action());
-
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Registered action callback for '{key}'");
-                }
+                LogWarning($"Cannot register action for non-existent key '{key}'.");
+                return;
             }
-            else
-            {
-                Debug.LogWarning($"[SettingsManager] Cannot register action for non-existent key '{key}'.");
-            }
+
+            EnsureCallbackList(key);
+            actionCallbacks[key].Add(value => action());
+            LogDebug($"Registered action callback for '{key}'");
         }
 
-        public void RegisterAction<T>(string key, System.Action<T> action)
+        public void RegisterAction<T>(string key, Action<T> action)
         {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                Debug.LogError("[SettingsManager] Attempted to register action with null or empty key.");
+            if (!ValidateKey(key) || !ValidateAction(action, key))
                 return;
-            }
-
-            if (action == null)
-            {
-                Debug.LogError($"[SettingsManager] Attempted to register null action for key '{key}'.");
-                return;
-            }
 
             var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
+            if (settingsObject == null)
             {
-                if (!actionCallbacks.ContainsKey(key))
-                {
-                    actionCallbacks[key] = new List<System.Action<object>>();
-                }
-
-                actionCallbacks[key].Add(value =>
-                {
-                    try
-                    {
-                        if (value is T typedValue)
-                        {
-                            action(typedValue);
-                        }
-                        else
-                        {
-                            action((T)System.Convert.ChangeType(value, typeof(T)));
-                        }
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Debug.LogError($"[SettingsManager] Error converting value for callback '{key}': {ex.Message}");
-                    }
-                });
-
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Registered typed action callback for '{key}' with type {typeof(T).Name}");
-                }
+                LogWarning($"Cannot register action for non-existent key '{key}'.");
+                return;
             }
-            else
+
+            EnsureCallbackList(key);
+            actionCallbacks[key].Add(value =>
             {
-                Debug.LogWarning($"[SettingsManager] Cannot register action for non-existent key '{key}'.");
-            }
+                try
+                {
+                    if (value is T typedValue)
+                    {
+                        action(typedValue);
+                    }
+                    else
+                    {
+                        T convertedValue = ConvertValue<T>(value);
+                        action(convertedValue);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Error converting value for callback '{key}': {ex.Message}");
+                }
+            });
+
+            LogDebug($"Registered typed action callback for '{key}' with type {typeof(T).Name}");
         }
 
         public T GetSettingValue<T>(string key)
         {
-            if (string.IsNullOrWhiteSpace(key))
+            if (!ValidateKey(key))
+                return default;
+
+            var settingsObject = GetSettingsObject(key);
+            if (settingsObject == null)
             {
-                Debug.LogError("[SettingsManager] Attempted to get setting with null or empty key.");
+                LogWarning($"Failed to retrieve setting '{key}' - returning default value");
                 return default;
             }
 
-            var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
-            {
-                var value = settingsObject.GetValue<T>();
-
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Retrieved setting: '{key}' of type {typeof(T).Name} = {value}");
-                }
-
-                return value;
-            }
-
-            if (debugMode)
-            {
-                Debug.LogWarning($"[SettingsManager] Failed to retrieve setting '{key}' - returning default value");
-            }
-
-            return default;
+            var value = settingsObject.GetValue<T>();
+            LogDebug($"Retrieved setting: '{key}' of type {typeof(T).Name} = {value}");
+            return value;
         }
 
         public void SetSettingValue<T>(string key, T value)
         {
-            if (string.IsNullOrWhiteSpace(key))
+            if (!ValidateKey(key))
+                return;
+
+            var settingsObject = GetSettingsObject(key);
+            if (settingsObject == null)
             {
-                Debug.LogError("[SettingsManager] Attempted to set setting with null or empty key.");
+                LogError($"Cannot set value for non-existent key '{key}'.");
                 return;
             }
 
-            var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
-            {
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Setting value: '{key}' of type {typeof(T).Name} = {value}");
-                }
-
-                settingsObject.SetValue(value);
-            }
-            else
-            {
-                Debug.LogError($"[SettingsManager] Cannot set value for non-existent key '{key}'.");
-            }
+            LogDebug($"Setting value: '{key}' of type {typeof(T).Name} = {value}");
+            settingsObject.SetValue(value);
         }
 
         public object GetSettingValue(string key)
         {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                Debug.LogError("[SettingsManager] Attempted to get setting with null or empty key.");
+            if (!ValidateKey(key))
                 return null;
-            }
 
             var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
-            {
-                var value = settingsObject.GetValue();
+            if (settingsObject == null)
+                return null;
 
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Retrieved setting: '{key}' = {value}");
-                }
-
-                return value;
-            }
-
-            return null;
+            var value = settingsObject.GetValue();
+            LogDebug($"Retrieved setting: '{key}' = {value}");
+            return value;
         }
 
         public void ResetToDefault(string key)
         {
-            if (string.IsNullOrWhiteSpace(key))
+            if (!ValidateKey(key))
+                return;
+
+            var settingsObject = GetSettingsObject(key);
+            if (settingsObject == null)
             {
-                Debug.LogError("[SettingsManager] Attempted to reset setting with null or empty key.");
+                LogError($"Cannot reset non-existent key '{key}'.");
                 return;
             }
 
-            var settingsObject = GetSettingsObject(key);
-            if (settingsObject != null)
-            {
-                if (debugMode)
-                {
-                    Debug.Log($"[SettingsManager] Resetting setting '{key}' to default value");
-                }
-
-                settingsObject.ResetToDefault();
-            }
-            else
-            {
-                Debug.LogError($"[SettingsManager] Cannot reset non-existent key '{key}'.");
-            }
+            LogDebug($"Resetting setting '{key}' to default value");
+            settingsObject.ResetToDefault();
         }
 
         public bool HasSetting(string key)
         {
-            return settingsObjects.ContainsKey(key);
+            return !string.IsNullOrWhiteSpace(key) && settingsObjects.ContainsKey(key);
         }
 
-        internal void GetAllSettings(out List<SettingsObject> settingsObjects)
+        public List<SettingsObject> GetAllSettings()
         {
-            settingsObjects = new List<SettingsObject>();
-            foreach (SettingsObject settingsObject in this.settingsObjects.Values)
+            return new List<SettingsObject>(settingsObjects.Values);
+        }
+
+        public void UnregisterAllActions(string key)
+        {
+            if (actionCallbacks.ContainsKey(key))
             {
-                settingsObjects.Add(settingsObject);
+                actionCallbacks.Remove(key);
+                LogDebug($"Unregistered all actions for key '{key}'");
             }
+        }
+
+        #endregion
+
+        #region Validation
+
+        private bool ValidateKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                LogError("Attempted to use null or empty key.");
+                return false;
+            }
+            return true;
+        }
+
+        private bool ValidateAction<T>(T action, string key) where T : class
+        {
+            if (action == null)
+            {
+                LogError($"Attempted to register null action for key '{key}'.");
+                return false;
+            }
+            return true;
+        }
+
+        private void EnsureCallbackList(string key)
+        {
+            if (!actionCallbacks.ContainsKey(key))
+            {
+                actionCallbacks[key] = new List<Action<object>>();
+            }
+        }
+
+        private T ConvertValue<T>(object value)
+        {
+            if (value == null)
+                return default;
+
+            Type targetType = typeof(T);
+            Type valueType = value.GetType();
+
+            if (targetType.IsAssignableFrom(valueType))
+            {
+                return (T)value;
+            }
+
+            if (targetType == typeof(float) && valueType == typeof(double))
+            {
+                return (T)(object)(float)(double)value;
+            }
+
+            if (targetType == typeof(float) && valueType == typeof(int))
+            {
+                return (T)(object)(float)(int)value;
+            }
+
+            if (targetType == typeof(int) && valueType == typeof(float))
+            {
+                return (T)(object)(int)(float)value;
+            }
+
+            if (value is IConvertible)
+            {
+                return (T)Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            return (T)value;
         }
 
         #endregion
