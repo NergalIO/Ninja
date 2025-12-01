@@ -1,28 +1,32 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-
 namespace Ninja.Gameplay.Enemy
 {
     public class FieldOfView : MonoBehaviour
     {
         [Header("FOV Settings")]
-        public float viewRadius = 6f;
+        [SerializeField] private float viewRadius = 6f;
         [Range(0, 360)]
-        public float viewAngle = 90f;
+        [SerializeField] private float viewAngle = 90f;
 
         [Header("Ray settings")]
-        public int rayCount = 60;
-        public LayerMask targetMask;
-        public LayerMask obstacleMask;
+        [SerializeField] private int rayCount = 60;
+        [SerializeField] private LayerMask targetMask;
+        [SerializeField] private LayerMask obstacleMask;
 
         [Header("Debug")]
-        public bool canSeePlayer;
-        public Transform player;
+        [SerializeField] private bool showDebugInfo;
 
+        private Transform target;
         private Mesh mesh;
         private Vector3 origin;
         private float startAngle;
+        private bool canSeeTarget;
+
+        public float ViewRadius => viewRadius;
+        public float ViewAngle => viewAngle;
+        public bool CanSeeTarget => canSeeTarget;
 
         private void Start()
         {
@@ -31,13 +35,18 @@ namespace Ninja.Gameplay.Enemy
             GetComponent<MeshFilter>().mesh = mesh;
         }
 
+        public void SetTarget(Transform targetTransform)
+        {
+            target = targetTransform;
+        }
+
         private void LateUpdate()
         {
             origin = transform.position;
             startAngle = transform.eulerAngles.y - viewAngle / 2f;
 
             GenerateMesh();
-            DetectPlayer();
+            DetectTarget();
         }
 
         private void GenerateMesh()
@@ -91,25 +100,33 @@ namespace Ninja.Gameplay.Enemy
             }
         }
 
-        private void DetectPlayer()
+        private void DetectTarget()
         {
-            canSeePlayer = false;
+            canSeeTarget = false;
 
-            if (player == null)
+            if (target == null)
                 return;
 
-            Vector3 dirToPlayer = (player.position - origin).normalized;
+            Vector3 directionToTarget = (target.position - origin).normalized;
+            float distanceToTarget = Vector3.Distance(origin, target.position);
 
-            if (Vector3.Distance(origin, player.position) > viewRadius)
+            if (distanceToTarget > viewRadius)
                 return;
 
-            if (Vector3.Angle(transform.forward, dirToPlayer) > viewAngle / 2f)
+            float angleToTarget = Vector3.Angle(transform.forward, directionToTarget);
+            if (angleToTarget > viewAngle / 2f)
                 return;
 
-            if (Physics.Raycast(origin, dirToPlayer, out RaycastHit hit, viewRadius))
+            // Check if there's an obstacle blocking the view to the target
+            if (Physics.Raycast(origin, directionToTarget, out RaycastHit hit, distanceToTarget, obstacleMask))
             {
-                if (hit.collider.transform == player)
-                    canSeePlayer = true;
+                // Obstacle is blocking the view
+                canSeeTarget = false;
+            }
+            else
+            {
+                // No obstacle, can see the target
+                canSeeTarget = true;
             }
         }
 

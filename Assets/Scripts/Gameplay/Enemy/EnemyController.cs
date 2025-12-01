@@ -6,6 +6,8 @@ namespace Ninja.Gameplay.Enemy
 {
     public class EnemyController : MonoBehaviour
     {
+        private const float PATROL_DISTANCE_THRESHOLD = 0.25f;
+
         [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
 
@@ -14,164 +16,166 @@ namespace Ninja.Gameplay.Enemy
 
         [Header("Patrol")]
         [SerializeField] private Transform[] patrolPoints;
-        private int currentPoint = 0;
         [SerializeField] private float patrolSpeed = 2f;
+        private int currentPatrolPointIndex = 0;
 
         [Header("Chase")]
         [SerializeField] private float chaseSpeed = 4f;
         [SerializeField] private float loseTargetTime = 3f;
-        private float lastSeenTarget;
+        private float lastSeenTargetTime;
 
         [Header("View Settings")]
-        [SerializeField] private FieldOfView fov;
-        [SerializeField] private float viewRadius = 6f;
-        [SerializeField] private float viewAngle = 60f;
-        [SerializeField] private LayerMask targetMask;
-        [SerializeField] private LayerMask obstructionMask;
+        [SerializeField] private FieldOfView fieldOfView;
 
         [Header("Search")]
         [SerializeField] private float timeToForgetTarget = 5f;
-        private float startedSearchingTime;
+        private float searchStartTime;
 
-        private EnemyState state = EnemyState.Patrol;
-        private Coroutine forgetCoroutine;
+        private EnemyState currentState = EnemyState.Patrol;
+        private Coroutine forgetTargetCoroutine;
 
         private void Awake()
         {
-            targetMask = LayerMask.GetMask("Target");
-            obstructionMask = LayerMask.GetMask("Obstruction");
-            fov.player = player;
+            if (fieldOfView != null && player != null)
+            {
+                fieldOfView.SetTarget(player);
+            }
         }
 
         private void FixedUpdate()
         {
-            switch (state)
+            CheckForPlayer();
+
+            switch (currentState)
             {
                 case EnemyState.Patrol:
-                    Patrol();
-                    LookForPlayer();
+                    HandlePatrol();
                     break;
 
                 case EnemyState.Chase:
-                    ChasePlayer();
-                    LookForPlayer();
+                    HandleChase();
                     break;
 
                 case EnemyState.Search:
-                    SearchPlayer();
-                    LookForPlayer();
+                    HandleSearch();
                     break;
             }
         }
 
-        #region Patrol
-        private void Patrol()
+        #region Vision
+        private void CheckForPlayer()
         {
-            agent.speed = patrolSpeed;
-
-            if (patrolPoints.Length == 0)
-                return;
-
-            if (!agent.pathPending && agent.remainingDistance < 0.25f)
+            if (fieldOfView != null && fieldOfView.CanSeeTarget)
             {
-                GoToNextPatrolPoint();
+                OnPlayerDetected();
             }
-        }
-
-        private void GoToNextPatrolPoint()
-        {
-            agent.destination = patrolPoints[currentPoint].position;
-            currentPoint = (currentPoint + 1) % patrolPoints.Length;
         }
         #endregion
 
-        #region Vision
-        /// <summary>
-        /// Проверяет, находится ли игрок в зоне FOV.
-        /// </summary>
-        private void LookForPlayer()
+        #region Patrol
+        private void HandlePatrol()
         {
-            if (fov.canSeePlayer)
-                OnFoundPlayer();
-            return;
+            agent.speed = patrolSpeed;
 
-            if (player == null) return;
-
-            Vector3 dirToPlayer = (player.position - transform.position).normalized;
-
-            if (Vector3.Distance(transform.position, player.position) > viewRadius)
+            if (patrolPoints == null || patrolPoints.Length == 0)
                 return;
 
-            if (Vector3.Angle(transform.forward, dirToPlayer) > viewAngle / 2f)
-                return;
-
-            if (Physics.Raycast(transform.position, dirToPlayer, out RaycastHit hit, viewRadius))
+            if (!agent.pathPending && agent.remainingDistance < PATROL_DISTANCE_THRESHOLD)
             {
-                if (((1 << hit.collider.gameObject.layer) & obstructionMask) != 0)
-                    return;
+                MoveToNextPatrolPoint();
             }
+        }
 
-            OnFoundPlayer();
+        private void MoveToNextPatrolPoint()
+        {
+            if (patrolPoints == null || patrolPoints.Length == 0)
+                return;
+
+            agent.destination = patrolPoints[currentPatrolPointIndex].position;
+            currentPatrolPointIndex = (currentPatrolPointIndex + 1) % patrolPoints.Length;
         }
         #endregion
 
         #region Chase
-        private void ChasePlayer()
+        private void HandleChase()
         {
-            if (player == null) return;
+            if (player == null)
+                return;
 
             agent.speed = chaseSpeed;
             agent.destination = player.position;
         }
 
-        private void OnFoundPlayer()
+        private void OnPlayerDetected()
         {
-            if (state != EnemyState.Chase)
+            if (currentState != EnemyState.Chase)
             {
-                state = EnemyState.Chase;
-                agent.speed = chaseSpeed;
+                ChangeState(EnemyState.Chase);
             }
 
-            lastSeenTarget = Time.time;
+            lastSeenTargetTime = Time.time;
 
-            if (forgetCoroutine != null)
-                StopCoroutine(forgetCoroutine);
+            if (forgetTargetCoroutine != null)
+            {
+                StopCoroutine(forgetTargetCoroutine);
+            }
 
-            forgetCoroutine = StartCoroutine(ForgetPlayerAfterDelay());
+            forgetTargetCoroutine = StartCoroutine(ForgetTargetAfterDelay());
         }
 
-        private IEnumerator ForgetPlayerAfterDelay()
+        private IEnumerator ForgetTargetAfterDelay()
         {
-            while (Time.time - lastSeenTarget < loseTargetTime)
+            while (Time.time - lastSeenTargetTime < loseTargetTime)
+            {
                 yield return null;
+            }
 
-            state = EnemyState.Search;
-            startedSearchingTime = Time.time;
-            forgetCoroutine = null;
+            ChangeState(EnemyState.Search);
+            searchStartTime = Time.time;
+            forgetTargetCoroutine = null;
+        }
+        #endregion
+
+        #region Search
+        private void HandleSearch()
+        {
+            agent.speed = patrolSpeed;
+
+            if (Time.time - searchStartTime > timeToForgetTarget)
+            {
+                ChangeState(EnemyState.Patrol);
+                MoveToNextPatrolPoint();
+            }
         }
         #endregion
 
         #region Noise Reaction
-
         private void OnTriggerEnter2D(Collider2D collider)
         {
             if (collider.CompareTag("NoiseArea"))
             {
-                OnFoundPlayer();
+                OnPlayerDetected();
             }
         }
-
         #endregion
 
-        #region Search
-        private void SearchPlayer()
+        #region State Management
+        private void ChangeState(EnemyState newState)
         {
-            agent.speed = patrolSpeed;
+            if (currentState == newState)
+                return;
 
-            if (Time.time - startedSearchingTime > timeToForgetTarget)
+            currentState = newState;
+
+            switch (newState)
             {
-                state = EnemyState.Patrol;
-                GoToNextPatrolPoint();
+                case EnemyState.Chase:
+                    agent.speed = chaseSpeed;
+                    break;
+                case EnemyState.Patrol:
+                case EnemyState.Search:
+                    agent.speed = patrolSpeed;
+                    break;
             }
         }
         #endregion
