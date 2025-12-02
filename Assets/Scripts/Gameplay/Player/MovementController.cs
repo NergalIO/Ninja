@@ -18,7 +18,10 @@ namespace Ninja.Gameplay.Player
         [SerializeField] private float defaultSpeed = 5f;
         [SerializeField] private float crouchSpeed = 3f;
         [SerializeField] private float sprintSpeed = 7f;
-        [SerializeField] private float rotationSpeed = 10f;
+        [SerializeField] private float rotationSpeed = 360f; // Скорость поворота в градусах в секунду
+        
+        [Header("Debug")]
+        [SerializeField] private bool showDebugInfo = false;
 
         public bool IsCrouching => controller.IsCrouching;
         public bool IsSprinting => controller.IsSprinting;
@@ -55,40 +58,87 @@ namespace Ninja.Gameplay.Player
             else if (controller.IsSprinting)
                 currentSpeed = sprintSpeed;
             rigidbody2d.linearVelocity = controller.MoveDirection * currentSpeed * Time.fixedDeltaTime;
+        }
+
+        private void Update()
+        {
+            // Проверяем и находим камеру, если она не была найдена
+            if (mainCamera == null)
+            {
+                mainCamera = Camera.main;
+            }
 
             RotateTowardsMouse();
         }
 
         private void RotateTowardsMouse()
         {
-            if (mainCamera == null || mouseInputController == null)
+            if (controller == null || mainCamera == null)
                 return;
 
-            Vector2 mouseScreenPosition = mouseInputController.MousePosition;
+            // Получаем позицию мыши через PlayerInputController
+            Vector2 mouseScreenPosition = controller.MousePosition;
             
-            if (mouseScreenPosition.magnitude < 0.1f)
+            // Проверяем, что позиция мыши валидна (больше нуля)
+            if (mouseScreenPosition.x < 0.1f && mouseScreenPosition.y < 0.1f)
                 return;
 
-            float distanceFromCamera = Mathf.Abs(mainCamera.transform.position.z - transform.position.z);
-            Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(new Vector3(mouseScreenPosition.x, mouseScreenPosition.y, distanceFromCamera));
+            // Преобразуем позицию мыши из экранных координат в мировые
+            // Для ортографической камеры используем правильное преобразование
+            Vector3 mouseWorldPosition;
+            if (mainCamera.orthographic)
+            {
+                // Для ортографической камеры используем Camera.ScreenToWorldPoint с правильным Z
+                // Z должен быть расстоянием от камеры до плоскости игрока
+                float zDistance = mainCamera.transform.position.z - transform.position.z;
+                mouseWorldPosition = mainCamera.ScreenToWorldPoint(new Vector3(mouseScreenPosition.x, mouseScreenPosition.y, zDistance));
+            }
+            else
+            {
+                // Для перспективной камеры
+                mouseWorldPosition = mainCamera.ScreenToWorldPoint(new Vector3(mouseScreenPosition.x, mouseScreenPosition.y, mainCamera.nearClipPlane));
+            }
+            
+            // Устанавливаем Z координату равной позиции игрока для 2D
             mouseWorldPosition.z = transform.position.z;
 
-            Vector3 directionToMouse = (mouseWorldPosition - transform.position).normalized;
+            // Вычисляем направление от игрока к мыши
+            Vector2 directionToMouse = new Vector2(
+                mouseWorldPosition.x - transform.position.x,
+                mouseWorldPosition.y - transform.position.y
+            );
             
-            if (directionToMouse.magnitude < 0.1f)
+            // Проверяем минимальное расстояние
+            float distance = directionToMouse.magnitude;
+            if (distance < 0.01f)
                 return;
 
+            directionToMouse.Normalize();
+
+            // Вычисляем целевой угол поворота по оси Z
             float targetAngle = Mathf.Atan2(directionToMouse.y, directionToMouse.x) * Mathf.Rad2Deg;
             float currentAngle = transform.eulerAngles.z;
             
+            // Вычисляем разницу углов с учетом кратчайшего пути
             float angleDifference = Mathf.DeltaAngle(currentAngle, targetAngle);
-            float newAngle = currentAngle + angleDifference * rotationSpeed * Time.fixedDeltaTime;
             
+            if (showDebugInfo)
+            {
+                Debug.Log($"Mouse Screen: {mouseScreenPosition}, World: {mouseWorldPosition}, Direction: {directionToMouse}, Current Angle: {currentAngle}, Target Angle: {targetAngle}, Difference: {angleDifference}");
+            }
+            
+            // Если разница очень мала, не поворачиваем
+            if (Mathf.Abs(angleDifference) < 0.1f)
+                return;
+            
+            // Плавно поворачиваем к целевому углу (используем Time.deltaTime для плавности)
+            float rotationStep = Mathf.Sign(angleDifference) * Mathf.Min(Mathf.Abs(angleDifference), rotationSpeed * Time.deltaTime);
+            float newAngle = currentAngle + rotationStep;
+            
+            // Применяем поворот только по оси Z
             transform.rotation = Quaternion.Euler(0f, 0f, newAngle);
         }
 
-        // WinZone теперь обрабатывается через скрипт WinZone на самом объекте WinZone
-        // Это предотвращает ложные срабатывания от дочерних объектов игрока (например, NoiseArea)
     }
 }
 

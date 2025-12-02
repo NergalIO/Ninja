@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-
 namespace Ninja.UI
 {
     public class MenuBase : MonoBehaviour
@@ -77,3 +76,4 @@ namespace Ninja.UI
         }
     }
 }
+

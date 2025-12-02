@@ -13,12 +13,10 @@ namespace Ninja.Gameplay.Enemy
 
         public override void Update()
         {
-            // Если есть сохраненная позиция патруля, идем к ней
             if (context.HasLastPatrolPosition)
             {
                 context.Agent.destination = context.LastPatrolPosition;
 
-                // Если достигли позиции, возвращаемся к патрулю
                 if (!context.Agent.pathPending && context.Agent.remainingDistance < EnemyStateContext.PATROL_DISTANCE_THRESHOLD)
                 {
                     context.HasLastPatrolPosition = false;
@@ -28,7 +26,6 @@ namespace Ninja.Gameplay.Enemy
             }
             else
             {
-                // Если нет сохраненной позиции, просто переходим к патрулю
                 context.MoveToNextPatrolPoint?.Invoke();
                 context.OnStateChange?.Invoke(EnemyState.Patrol);
             }

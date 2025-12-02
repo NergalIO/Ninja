@@ -13,7 +13,7 @@ namespace Ninja.Core
         protected virtual void Awake()
         {
             if (instance != null && instance.Equals(null))
-            instance = null;
+                instance = null;
 
             if (instance != null && instance != this)
             {
