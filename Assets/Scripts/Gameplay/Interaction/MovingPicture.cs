@@ -2,9 +2,6 @@ using UnityEngine;
 
 namespace Ninja.Gameplay.Interaction
 {
-    /// <summary>
-    /// Скрипт для картин, которые можно отодвигать
-    /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public class MovingPicture : InteractableObject
     {
@@ -86,9 +83,6 @@ namespace Ninja.Gameplay.Interaction
 
         public bool IsMoved => isMoved;
 
-        /// <summary>
-        /// Визуализация направления движения в редакторе
-        /// </summary>
         protected override void OnDrawGizmosSelected()
         {
             base.OnDrawGizmosSelected();
@@ -102,4 +96,3 @@ namespace Ninja.Gameplay.Interaction
         }
     }
 }
-

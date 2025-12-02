@@ -2,9 +2,6 @@ using UnityEngine;
 
 namespace Ninja.Gameplay.Interaction
 {
-    /// <summary>
-    /// Базовый класс для объектов взаимодействия
-    /// </summary>
     public abstract class InteractableObject : MonoBehaviour, IInteractable
     {
         [Header("Interaction Settings")]
@@ -50,14 +47,8 @@ namespace Ninja.Gameplay.Interaction
             return interactionDistance;
         }
 
-        /// <summary>
-        /// Переопределите этот метод для реализации конкретной логики взаимодействия
-        /// </summary>
         protected abstract void OnInteract(Transform interactor);
 
-        /// <summary>
-        /// Визуализация дистанции взаимодействия в редакторе
-        /// </summary>
         protected virtual void OnDrawGizmosSelected()
         {
             Gizmos.color = Color.yellow;
@@ -65,4 +56,3 @@ namespace Ninja.Gameplay.Interaction
         }
     }
 }
-

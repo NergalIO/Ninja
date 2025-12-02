@@ -2,9 +2,6 @@ using UnityEngine;
 
 namespace Ninja.Gameplay.Interaction
 {
-    /// <summary>
-    /// Скрипт для дверей, которые можно открывать/закрывать
-    /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public class Door : InteractableObject
     {
@@ -81,9 +78,7 @@ namespace Ninja.Gameplay.Interaction
 
         private bool HasKey()
         {
-            // Здесь можно добавить проверку наличия ключа у игрока
-            // Например, через Inventory или GameManager
-            return false; // По умолчанию ключа нет
+            return false;
         }
 
         private void PlaySound(AudioClip clip)
@@ -107,4 +102,3 @@ namespace Ninja.Gameplay.Interaction
         public bool IsOpen => isOpen;
     }
 }
-

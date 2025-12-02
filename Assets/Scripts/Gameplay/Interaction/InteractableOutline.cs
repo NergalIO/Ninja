@@ -2,10 +2,6 @@ using UnityEngine;
 
 namespace Ninja.Gameplay.Interaction
 {
-    /// <summary>
-    /// Компонент для визуальной обводки интерактивных объектов
-    /// </summary>
-    [RequireComponent(typeof(SpriteRenderer))]
     public class InteractableOutline : MonoBehaviour
     {
         [Header("Outline Settings")]
@@ -23,7 +19,6 @@ namespace Ninja.Gameplay.Interaction
             spriteRenderer = GetComponent<SpriteRenderer>();
             interactable = GetComponent<IInteractable>();
 
-            // Создаем LineRenderer если его нет
             lineRenderer = GetComponent<LineRenderer>();
             if (lineRenderer == null)
             {
@@ -31,6 +26,18 @@ namespace Ninja.Gameplay.Interaction
             }
 
             SetupLineRenderer();
+        }
+
+        private void Start()
+        {
+            if (spriteRenderer == null)
+            {
+                Collider2D col = GetComponent<Collider2D>();
+                if (col != null)
+                {
+                    Debug.LogWarning($"[InteractableOutline] На объекте {gameObject.name} нет SpriteRenderer. Используются размеры коллайдера.");
+                }
+            }
         }
 
         private void SetupLineRenderer()
@@ -41,7 +48,16 @@ namespace Ninja.Gameplay.Interaction
             lineRenderer.endColor = outlineColor;
             lineRenderer.startWidth = outlineWidth;
             lineRenderer.endWidth = outlineWidth;
-            lineRenderer.sortingOrder = spriteRenderer.sortingOrder + 1;
+            
+            if (spriteRenderer != null)
+            {
+                lineRenderer.sortingOrder = spriteRenderer.sortingOrder + 1;
+            }
+            else
+            {
+                lineRenderer.sortingOrder = 100;
+            }
+            
             lineRenderer.enabled = false;
         }
 
@@ -50,7 +66,6 @@ namespace Ninja.Gameplay.Interaction
             if (interactable == null)
                 return;
 
-            // Обновляем обводку в зависимости от состояния
             bool shouldShow = showOutline && interactable != null;
             lineRenderer.enabled = shouldShow;
 
@@ -62,20 +77,32 @@ namespace Ninja.Gameplay.Interaction
 
         private void UpdateOutline()
         {
-            if (spriteRenderer.sprite == null)
-                return;
-
-            // Получаем границы спрайта в локальных координатах
-            Bounds spriteBounds = spriteRenderer.sprite.bounds;
+            Vector3 localSize;
             
-            // Преобразуем размеры спрайта в локальные координаты с учетом масштаба
-            Vector3 localSize = new Vector3(
-                spriteBounds.size.x * transform.lossyScale.x,
-                spriteBounds.size.y * transform.lossyScale.y,
-                0
-            );
+            if (spriteRenderer != null && spriteRenderer.sprite != null)
+            {
+                Bounds spriteBounds = spriteRenderer.sprite.bounds;
+                
+                localSize = new Vector3(
+                    spriteBounds.size.x * transform.lossyScale.x,
+                    spriteBounds.size.y * transform.lossyScale.y,
+                    0
+                );
+            }
+            else
+            {
+                Collider2D col = GetComponent<Collider2D>();
+                if (col != null)
+                {
+                    Bounds bounds = col.bounds;
+                    localSize = transform.InverseTransformVector(bounds.size);
+                }
+                else
+                {
+                    localSize = Vector3.one;
+                }
+            }
 
-            // Создаем прямоугольную обводку вокруг спрайта
             int totalSegments = segmentsPerCorner * 4;
             lineRenderer.positionCount = totalSegments + 1;
 
@@ -84,7 +111,6 @@ namespace Ninja.Gameplay.Interaction
 
             int index = 0;
 
-            // Верхняя сторона
             for (int i = 0; i < segmentsPerCorner; i++)
             {
                 float t = (float)i / segmentsPerCorner;
@@ -95,7 +121,6 @@ namespace Ninja.Gameplay.Interaction
                 ));
             }
 
-            // Правая сторона
             for (int i = 0; i < segmentsPerCorner; i++)
             {
                 float t = (float)i / segmentsPerCorner;
@@ -106,7 +131,6 @@ namespace Ninja.Gameplay.Interaction
                 ));
             }
 
-            // Нижняя сторона
             for (int i = 0; i < segmentsPerCorner; i++)
             {
                 float t = (float)i / segmentsPerCorner;
@@ -117,7 +141,6 @@ namespace Ninja.Gameplay.Interaction
                 ));
             }
 
-            // Левая сторона
             for (int i = 0; i < segmentsPerCorner; i++)
             {
                 float t = (float)i / segmentsPerCorner;
@@ -128,29 +151,19 @@ namespace Ninja.Gameplay.Interaction
                 ));
             }
 
-            // Замыкаем контур
             lineRenderer.SetPosition(index, new Vector3(-halfWidth, halfHeight, 0));
         }
 
-        /// <summary>
-        /// Показать обводку
-        /// </summary>
         public void ShowOutline()
         {
             showOutline = true;
         }
 
-        /// <summary>
-        /// Скрыть обводку
-        /// </summary>
         public void HideOutline()
         {
             showOutline = false;
         }
 
-        /// <summary>
-        /// Установить цвет обводки
-        /// </summary>
         public void SetOutlineColor(Color color)
         {
             outlineColor = color;
@@ -162,4 +175,3 @@ namespace Ninja.Gameplay.Interaction
         }
     }
 }
-

@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEditor;
+using Ninja.Core;
 
 
 namespace Ninja.Gameplay.Enemy
@@ -203,7 +204,7 @@ namespace Ninja.Gameplay.Enemy
             Color rayColor = playerInFOV ? new Color(1f, 0f, 0f, 0.5f) : new Color(0.6f, 0.6f, 0.6f, 0.4f);
 
             Gizmos.color = baseColor;
-            DrawCircleGizmo(currentOrigin, viewRadius);
+            GizmosUtils.DrawCircle(currentOrigin, viewRadius);
 
             int gizmoRayCount = Mathf.Max(20, rayCountHorizontal / 2);
             float angleStep = viewAngleHorizontal / gizmoRayCount;
@@ -270,21 +271,5 @@ namespace Ninja.Gameplay.Enemy
                 Gizmos.DrawLine(currentOrigin, target.position);
             }
         }
-
-        private void DrawCircleGizmo(Vector3 center, float radius)
-        {
-            int segments = 32;
-            float angleStep = 360f / segments;
-            Vector3 previousPoint = center + new Vector3(radius, 0f, 0f);
-
-            for (int i = 1; i <= segments; i++)
-            {
-                float angle = i * angleStep * Mathf.Deg2Rad;
-                Vector3 point = center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f);
-                Gizmos.DrawLine(previousPoint, point);
-                previousPoint = point;
-            }
-        }
-
     }
 }
