@@ -21,7 +21,6 @@ namespace Ninja.Gameplay.Enemy
 
             context.Agent.destination = context.NoisePosition;
 
-            // Если достигли места шума, переходим к сканированию
             if (!context.Agent.pathPending && context.Agent.remainingDistance < EnemyStateContext.PATROL_DISTANCE_THRESHOLD)
             {
                 context.OnStateChange?.Invoke(EnemyState.Scan);

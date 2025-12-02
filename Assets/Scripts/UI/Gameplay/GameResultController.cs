@@ -13,37 +13,39 @@ namespace Ninja.UI.Gameplay
 
         public void Start()
         {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnPlayerCatched += PlayerCatched;
-                GameManager.Instance.OnPlayerEscapeTrigger += PlayerWin;
-            }
+            if (GameManager.Instance == null)
+                return;
+
+            GameManager.Instance.OnPlayerCatched += PlayerCatched;
+            GameManager.Instance.OnPlayerEscapeTrigger += PlayerWin;
         }
 
         private void OnDestroy()
         {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnPlayerCatched -= PlayerCatched;
-                GameManager.Instance.OnPlayerEscapeTrigger -= PlayerWin;
-            }
+            if (GameManager.Instance == null)
+                return;
+
+            GameManager.Instance.OnPlayerCatched -= PlayerCatched;
+            GameManager.Instance.OnPlayerEscapeTrigger -= PlayerWin;
         }
 
         public void PlayerCatched()
-        {   
-            Debug.Log("PlayerCatched event triggered!");
+        {
             OpenLoseWonWindow(false);
         }
 
         public void PlayerWin()
         {
-            Debug.Log("PlayerWin event triggered!");
             OpenLoseWonWindow(true);
         }
 
         public void OpenLoseWonWindow(bool isWon)
         {
-            GameManager.Instance.PauseGame();
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.PauseGame();
+            }
+
             loseWonWindow.isWon = isWon;
             loseWonWindow.UpdateStatistics();
             loseWonWindow.Open();

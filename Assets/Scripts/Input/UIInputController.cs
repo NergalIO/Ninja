@@ -43,6 +43,15 @@ namespace Ninja.Input
             _inputActions.Enable();
         }
 
+        private void Update()
+        {
+            // Постоянно обновляем позицию мыши, так как она может не вызывать события при каждом кадре
+            if (_inputActions != null && _inputActions.UI.Point != null)
+            {
+                Point = _inputActions.UI.Point.ReadValue<Vector2>();
+            }
+        }
+
         protected override void OnDestroy()
         {
             if (_inputActions != null)

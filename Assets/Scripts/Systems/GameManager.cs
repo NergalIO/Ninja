@@ -38,18 +38,14 @@ namespace Ninja.Systems {
         protected override void OnSingletonInitialized() {
             base.OnSingletonInitialized();
             
-            // Загружаем сохраненные данные
             dataCollector.LoadData();
             
-            // Подключаем события к сбору данных
             OnPlayerCatched += HandlePlayerCatched;
             OnPlayerFound += HandlePlayerFound;
             OnPlayerEscapeTrigger += HandlePlayerEscape;
             
-            // Подписываемся на загрузку сцен
             SceneManager.sceneLoaded += OnSceneLoaded;
             
-            // Инициализируем текущий уровень, если уже в игровой сцене
             InitializeCurrentLevel();
             
             if (pauseOnStart) {
@@ -67,7 +63,6 @@ namespace Ninja.Systems {
         private void InitializeCurrentLevel()
         {
             string sceneName = SceneManager.GetActiveScene().name;
-            // Если это не меню, устанавливаем текущий уровень
             if (sceneName != "Menu" && !string.IsNullOrEmpty(sceneName))
             {
                 SetCurrentLevel(sceneName);
@@ -76,17 +71,14 @@ namespace Ninja.Systems {
 
         protected override void OnDestroy()
         {
-            // Отписываемся от событий
             SceneManager.sceneLoaded -= OnSceneLoaded;
             
-            // Сохраняем данные перед выходом только если уровень не завершен
             if (!string.IsNullOrEmpty(CurrentScene) && CurrentScene != "Menu")
             {
-                dataCollector.SaveData(CurrentScene);
+                dataCollector.SaveData();
             }
             
             base.OnDestroy();
-            // Отключаем события при уничтожении
             OnPlayerCatched -= HandlePlayerCatched;
             OnPlayerFound -= HandlePlayerFound;
             OnPlayerEscapeTrigger -= HandlePlayerEscape;
@@ -94,10 +86,9 @@ namespace Ninja.Systems {
 
         private void OnApplicationQuit()
         {
-            // Сохраняем данные при выходе из приложения только если уровень не завершен
             if (!string.IsNullOrEmpty(CurrentScene) && CurrentScene != "Menu")
             {
-                dataCollector.SaveData(CurrentScene);
+                dataCollector.SaveData();
             }
         }
 
@@ -142,7 +133,7 @@ namespace Ninja.Systems {
         public void SetCurrentLevel(string levelId)
         {
             dataCollector.SetCurrentLevel(levelId);
-            levelStartTime = Time.time; // Запоминаем время начала уровня
+            levelStartTime = Time.time;
         }
 
         public void SetPlayerTransform(Transform player)
@@ -152,7 +143,7 @@ namespace Ninja.Systems {
 
         public void NotifyPlayerHeard(Vector3 noisePosition)
         {
-            dataCollector.RecordPlayerHeard(noisePosition, CurrentScene);
+            dataCollector.RecordPlayerHeard(noisePosition);
             OnPlayerHeard?.Invoke(noisePosition);
         }
 
@@ -174,26 +165,23 @@ namespace Ninja.Systems {
         private void HandlePlayerCatched()
         {
             dataCollector.RecordPlayerCaught();
-            // Сохраняем данные только в конце уровня
-            dataCollector.SaveData(CurrentScene);
+            dataCollector.SaveData();
         }
 
         private void HandlePlayerFound()
         {
             dataCollector.RecordPlayerDetected();
-            // Не сохраняем при обнаружении, только в конце уровня
         }
 
         private void HandlePlayerEscape()
         {
-            dataCollector.RecordPlayerEscape(CurrentScene);
-            // Сохраняем данные только в конце уровня
-            dataCollector.SaveData(CurrentScene);
+            dataCollector.RecordPlayerEscape();
+            dataCollector.SaveData();
         }
 
         public void SaveLevelData()
         {
-            dataCollector.SaveData(CurrentScene);
+            dataCollector.SaveData();
         }
 
         public void LoadLevelData()
@@ -201,7 +189,6 @@ namespace Ninja.Systems {
             dataCollector.LoadData();
         }
 
-        // Удобные методы для доступа к данным из любого скрипта
         public static LevelData GetLevelData(string levelId)
         {
             if (Instance != null)

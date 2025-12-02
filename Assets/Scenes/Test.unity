@@ -736,7 +736,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1459154562}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 93cb8193b037ce34ab73a56c03eeb0c2, type: 3}
+  m_Script: {fileID: 11500000, guid: b76aecafd5742f045b063603ebb7a9ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Player.WinZone
 --- !u!1 &1460370532
@@ -1568,6 +1568,10 @@ PrefabInstance:
       propertyPath: FollowOffset.z
       value: -10
       objectReference: {fileID: 0}
+    - target: {fileID: 6777268593973757151, guid: 152be699d82e56142bdb51bb759c35a4, type: 3}
+      propertyPath: m_TagString
+      value: MainCamera
+      objectReference: {fileID: 0}
     - target: {fileID: 7960330730283120371, guid: 152be699d82e56142bdb51bb759c35a4, type: 3}
       propertyPath: orthographic size
       value: 6
@@ -1773,7 +1777,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3406261285952449502, guid: c69f325ea2926e547ad68b72f5c7dd1c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8884275618695049192}
+    - targetCorrespondingSourceObject: {fileID: 3406261285952449502, guid: c69f325ea2926e547ad68b72f5c7dd1c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8884275618695049191}
   m_SourcePrefab: {fileID: 100100000, guid: c69f325ea2926e547ad68b72f5c7dd1c, type: 3}
 --- !u!114 &8884275618695049187 stripped
 MonoBehaviour:
@@ -1797,6 +1807,57 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a140498d3a7b99418eb2f40b2cabd09, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.InputSystem.InputController
+--- !u!114 &8884275618695049189 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3584422684912602350, guid: c69f325ea2926e547ad68b72f5c7dd1c, type: 3}
+  m_PrefabInstance: {fileID: 8884275618695049186}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 076f89e7a4a6d8e46a49225d57c94516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.InputSystem.PlayerInputController
+--- !u!1 &8884275618695049190 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3406261285952449502, guid: c69f325ea2926e547ad68b72f5c7dd1c, type: 3}
+  m_PrefabInstance: {fileID: 8884275618695049186}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8884275618695049191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8884275618695049190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a458f9cc8194f44c920e15d29b51d77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Player.PlayerInteractionController
+  inputController: {fileID: 8884275618695049189}
+  interactionPoint: {fileID: 1487745446}
+  interactionRange: 1
+  interactionLayer:
+    serializedVersion: 2
+    m_Bits: 512
+  showDebugGizmos: 1
+  facingAngleThreshold: 90
+  facingDirectionLineLength: 1.5
+  facingDirectionColor: {r: 0, g: 0, b: 1, a: 1}
+  facingSectorColor: {r: 0, g: 1, b: 1, a: 0.3}
+--- !u!114 &8884275618695049192
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8884275618695049190}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 076f89e7a4a6d8e46a49225d57c94516, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Input.PlayerInputController
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

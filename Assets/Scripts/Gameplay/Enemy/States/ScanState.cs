@@ -14,14 +14,12 @@ namespace Ninja.Gameplay.Enemy
 
         public override void Update()
         {
-            // Проверяем видимость игрока во время сканирования
             if (context.FieldOfView != null && context.FieldOfView.CanSeeTarget)
             {
                 context.OnPlayerDetected?.Invoke();
                 return;
             }
 
-            // Если время сканирования истекло, возвращаемся к патрулю
             if (Time.time - context.ScanStartTime > context.ScanDuration)
             {
                 context.OnStateChange?.Invoke(EnemyState.Return);

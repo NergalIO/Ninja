@@ -3,35 +3,29 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using Ninja.Gameplay.Levels;
+using Ninja.Gameplay.Player;
 
 namespace Ninja.Systems.Data
 {
-    [Serializable]
-    public class LevelDataContainer
-    {
-        public Dictionary<string, LevelData> runs = new Dictionary<string, LevelData>();
-    }
-
     public class LevelDataCollector
     {
         private const string SAVE_FILE_NAME = "GameRuns.json";
         
-        private Dictionary<string, LevelData> allRuns = new Dictionary<string, LevelData>(); // Все пробеги по GUID
+        private Dictionary<string, LevelData> allRuns = new Dictionary<string, LevelData>();
         private string currentLevelId;
         private Transform playerTransform;
-        private LevelData currentRunData; // Временные данные для текущего пробега
+        private LevelData currentRunData;
+
+        private bool HasActiveRun => currentRunData != null && !string.IsNullOrEmpty(currentLevelId);
 
         public void SetCurrentLevel(string levelId)
         {
-            // Завершаем предыдущий пробег, если он был
-            if (currentRunData != null && !string.IsNullOrEmpty(currentLevelId))
+            if (HasActiveRun)
             {
                 SaveCurrentRun();
             }
 
             currentLevelId = levelId;
-            
-            // Создаем новый временный объект данных для текущего пробега с новым GUID
             currentRunData = new LevelData(levelId);
             currentRunData.IncrementTimesPlayed();
         }
@@ -43,42 +37,67 @@ namespace Ninja.Systems.Data
 
         public void RecordPlayerCaught()
         {
-            if (currentRunData == null || string.IsNullOrEmpty(currentLevelId))
+            if (!HasActiveRun)
                 return;
 
-            Vector3 position = playerTransform != null ? playerTransform.position : Vector3.zero;
+            Vector3 position = GetPlayerPosition();
             currentRunData.AddCatch(position);
         }
 
         public void RecordPlayerDetected()
         {
-            if (currentRunData == null || string.IsNullOrEmpty(currentLevelId))
+            if (!HasActiveRun)
                 return;
 
-            Vector3 position = playerTransform != null ? playerTransform.position : Vector3.zero;
+            Vector3 position = GetPlayerPosition();
             currentRunData.AddDetection(position);
         }
 
-        public void RecordPlayerHeard(Vector3 noisePosition, string sceneName = null)
+        public void RecordPlayerHeard(Vector3 noisePosition)
         {
-            if (currentRunData == null || string.IsNullOrEmpty(currentLevelId))
+            if (!HasActiveRun)
                 return;
 
             currentRunData.AddHeard(noisePosition);
         }
 
-        public void RecordPlayerEscape(string sceneName = null)
+        public void RecordPlayerEscape()
         {
-            if (currentRunData == null || string.IsNullOrEmpty(currentLevelId))
+            if (!HasActiveRun)
                 return;
 
-            Vector3 position = playerTransform != null ? playerTransform.position : Vector3.zero;
+            Vector3 position = GetPlayerPosition();
             currentRunData.AddCompletion(position);
+        }
+
+        private Vector3 GetPlayerPosition()
+        {
+            if (playerTransform == null)
+            {
+                GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+                if (playerObject != null)
+                {
+                    playerTransform = playerObject.transform;
+                }
+                else
+                {
+                    var movementController = UnityEngine.Object.FindFirstObjectByType<MovementController>();
+                    if (movementController != null)
+                    {
+                        playerTransform = movementController.transform;
+                    }
+                    else
+                    {
+                        return Vector3.zero;
+                    }
+                }
+            }
+
+            return playerTransform.position;
         }
 
         public LevelData GetLevelData(string levelId)
         {
-            // Возвращаем данные для конкретного уровня (суммируем все пробеги этого уровня)
             LevelData combined = new LevelData(levelId);
             foreach (var run in allRuns.Values)
             {
@@ -92,7 +111,6 @@ namespace Ninja.Systems.Data
 
         public LevelData GetCurrentLevelData()
         {
-            // Возвращаем данные текущего пробега
             return currentRunData;
         }
 
@@ -101,20 +119,16 @@ namespace Ninja.Systems.Data
             if (currentRunData == null || string.IsNullOrEmpty(currentRunData.Guid))
                 return;
 
-            // Сохраняем текущий пробег в общий словарь
             allRuns[currentRunData.Guid] = currentRunData;
         }
 
         private void MergeData(LevelData target, LevelData source)
         {
-            // Объединяем счетчики и позиции
-            // Добавляем TimesPlayed из source в target
             for (int i = 0; i < source.TimesPlayed; i++)
             {
                 target.IncrementTimesPlayed();
             }
             
-            // Добавляем позиции из source в target (счетчики обновятся автоматически)
             foreach (var pos in source.CatchPositions)
             {
                 target.AddCatch(pos);
@@ -135,7 +149,6 @@ namespace Ninja.Systems.Data
 
         public IReadOnlyDictionary<string, LevelData> GetAllLevelData()
         {
-            // Возвращаем все пробеги, сгруппированные по levelId
             Dictionary<string, LevelData> result = new Dictionary<string, LevelData>();
             foreach (var run in allRuns.Values)
             {
@@ -161,49 +174,29 @@ namespace Ninja.Systems.Data
         }
 
         #region Save/Load
-        public void SaveData(string sceneName = null)
+        public void SaveData()
         {
             try
             {
-                // Сохраняем текущий пробег перед сохранением файла
-                if (currentRunData != null && !string.IsNullOrEmpty(currentLevelId))
+                if (HasActiveRun)
                 {
                     SaveCurrentRun();
                 }
 
-                // Загружаем существующие данные из файла
                 LoadDataInternal();
 
-                // Объединяем текущие пробеги с загруженными
-                foreach (var run in allRuns.Values)
-                {
-                    // Пробеги уже в allRuns, просто убеждаемся что они сохранены
-                }
-
-                // Проверяем, есть ли данные для сохранения
                 if (allRuns.Count == 0)
-                {
-                    Debug.LogWarning("No run data to save. AllRuns is empty.");
                     return;
-                }
 
-                // Создаем контейнер с пробегами
                 LevelDataContainer container = new LevelDataContainer();
                 container.runs = new Dictionary<string, LevelData>(allRuns);
 
-                // JsonUtility не поддерживает Dictionary напрямую, используем обходной путь
                 string json = SerializeRuns(container.runs);
                 
-                // Проверяем, что JSON не пустой
                 if (string.IsNullOrEmpty(json) || json == "{}")
-                {
-                    Debug.LogWarning("Generated JSON is empty. No data to save.");
                     return;
-                }
 
-                string filePath = GetSaveFilePath(sceneName);
-
-                // Создаем директорию, если её нет
+                string filePath = GetSaveFilePath();
                 string directory = Path.GetDirectoryName(filePath);
                 if (!Directory.Exists(directory))
                 {
@@ -211,7 +204,6 @@ namespace Ninja.Systems.Data
                 }
 
                 File.WriteAllText(filePath, json);
-                Debug.Log($"Game runs data saved to: {filePath} (Runs: {allRuns.Count})");
             }
             catch (Exception e)
             {
@@ -221,14 +213,6 @@ namespace Ninja.Systems.Data
 
         private string SerializeRuns(Dictionary<string, LevelData> runs)
         {
-            // JsonUtility не поддерживает Dictionary, создаем список пар
-            var runList = new List<KeyValuePair<string, LevelData>>();
-            foreach (var kvp in runs)
-            {
-                runList.Add(kvp);
-            }
-            
-            // Используем простой формат JSON вручную
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             sb.Append("{\n");
             bool first = true;
@@ -255,23 +239,14 @@ namespace Ninja.Systems.Data
                 string filePath = GetSaveFilePath();
 
                 if (!File.Exists(filePath))
-                {
-                    Debug.Log($"No save file found at: {filePath}");
                     return;
-                }
 
                 string json = File.ReadAllText(filePath);
-                
-                // Парсим JSON вручную, так как JsonUtility не поддерживает Dictionary
                 Dictionary<string, LevelData> loadedRuns = DeserializeRuns(json);
 
                 if (loadedRuns == null || loadedRuns.Count == 0)
-                {
-                    Debug.LogWarning("Failed to parse game runs data from JSON or no runs found");
                     return;
-                }
 
-                // Объединяем загруженные пробеги с текущими (не перезаписываем текущий пробег)
                 foreach (var kvp in loadedRuns)
                 {
                     if (!allRuns.ContainsKey(kvp.Key))
@@ -279,8 +254,6 @@ namespace Ninja.Systems.Data
                         allRuns[kvp.Key] = kvp.Value;
                     }
                 }
-
-                Debug.Log($"Game runs data loaded from: {filePath}. Loaded {loadedRuns.Count} runs.");
             }
             catch (Exception e)
             {
@@ -294,11 +267,8 @@ namespace Ninja.Systems.Data
             
             try
             {
-                // Простой парсинг JSON формата {"GUID-1": {...}, "GUID-2": {...}}
-                // Удаляем пробелы и переносы строк для упрощения
                 json = json.Replace("\n", "").Replace("\r", "").Replace(" ", "");
                 
-                // Находим все GUID и их данные
                 int startIndex = json.IndexOf('{') + 1;
                 int endIndex = json.LastIndexOf('}');
                 
@@ -307,11 +277,9 @@ namespace Ninja.Systems.Data
 
                 string content = json.Substring(startIndex, endIndex - startIndex);
                 
-                // Разбиваем по запятым между парами ключ-значение
                 int pos = 0;
                 while (pos < content.Length)
                 {
-                    // Находим следующий GUID
                     int guidStart = content.IndexOf('"', pos);
                     if (guidStart == -1) break;
                     int guidEnd = content.IndexOf('"', guidStart + 1);
@@ -319,11 +287,9 @@ namespace Ninja.Systems.Data
                     
                     string guid = content.Substring(guidStart + 1, guidEnd - guidStart - 1);
                     
-                    // Находим начало данных (после :)
                     int dataStart = content.IndexOf('{', guidEnd);
                     if (dataStart == -1) break;
                     
-                    // Находим конец данных (соответствующая закрывающая скобка)
                     int braceCount = 0;
                     int dataEnd = dataStart;
                     for (int i = dataStart; i < content.Length; i++)
@@ -345,7 +311,6 @@ namespace Ninja.Systems.Data
                         runs[guid] = runData;
                     }
                     
-                    // Переходим к следующей паре
                     pos = dataEnd;
                     if (pos < content.Length && content[pos] == ',')
                         pos++;
@@ -364,27 +329,19 @@ namespace Ninja.Systems.Data
             try
             {
                 if (!File.Exists(filePath))
-                {
-                    Debug.LogWarning($"File not found: {filePath}");
                     return;
-                }
 
                 string json = File.ReadAllText(filePath);
                 Dictionary<string, LevelData> loadedRuns = DeserializeRuns(json);
 
                 if (loadedRuns == null || loadedRuns.Count == 0)
-                {
-                    Debug.LogWarning("Failed to parse game runs data from JSON");
                     return;
-                }
 
                 allRuns.Clear();
                 foreach (var kvp in loadedRuns)
                 {
                     allRuns[kvp.Key] = kvp.Value;
                 }
-
-                Debug.Log($"Game runs data loaded from: {filePath}. Loaded {allRuns.Count} runs.");
             }
             catch (Exception e)
             {
@@ -398,7 +355,6 @@ namespace Ninja.Systems.Data
             if (!Directory.Exists(directory))
                 return new string[0];
 
-            // Ищем файл GameRuns.json
             string filePath = GetSaveFilePath();
             if (File.Exists(filePath))
             {
@@ -407,9 +363,8 @@ namespace Ninja.Systems.Data
             return new string[0];
         }
 
-        private string GetSaveFilePath(string sceneName = null)
+        private string GetSaveFilePath()
         {
-            // Всегда используем один файл для всех пробегов
             return Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
         }
 

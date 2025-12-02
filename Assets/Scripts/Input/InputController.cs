@@ -13,6 +13,7 @@ namespace Ninja.Input
         public Vector2 Move { get; private set; }
         public Vector2 Look { get; private set; }
         public bool Interact { get; private set; }
+        public bool InteractPressed { get; private set; }
         public bool Crouch { get; private set; }
         public bool Sprint { get; private set; }
 
@@ -44,7 +45,22 @@ namespace Ninja.Input
 
         public void OnInteract(InputAction.CallbackContext context)
         {
-            Interact = context.ReadValue<float>() > 0.5f;
+            // Обрабатываем момент нажатия (performed) для взаимодействия
+            if (context.performed)
+            {
+                Interact = true;
+                InteractPressed = true;
+            }
+            else if (context.canceled)
+            {
+                Interact = false;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // Сбрасываем флаг нажатия после обработки
+            InteractPressed = false;
         }
 
         public void OnCrouch(InputAction.CallbackContext context)

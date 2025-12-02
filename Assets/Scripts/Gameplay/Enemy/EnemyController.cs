@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using Ninja.Systems;
@@ -6,6 +7,9 @@ namespace Ninja.Gameplay.Enemy
 {
     public class EnemyController : MonoBehaviour
     {
+        private const float CATCH_DISTANCE_THRESHOLD = 1.2f;
+        private const float MOVEMENT_THRESHOLD = 0.1f;
+
         [Header("State Machine")]
         [SerializeField] private EnemyState state;
         
@@ -44,14 +48,8 @@ namespace Ninja.Gameplay.Enemy
         private EnemyStateBase currentState;
         private EnemyState currentStateType = EnemyState.Patrol;
         private bool playerCaughtTriggered = false;
-
-        // State instances
-        private PatrolState patrolState;
-        private ChaseState chaseState;
-        private SearchState searchState;
-        private InvestigateState investigateState;
-        private ScanState scanState;
-        private ReturnState returnState;
+        private bool hasInitializedState = false;
+        private Dictionary<EnemyState, EnemyStateBase> stateInstances;
 
         private void Awake()
         {
@@ -61,14 +59,37 @@ namespace Ninja.Gameplay.Enemy
             if (agent != null)
             {
                 agent.updateRotation = false;
+                agent.enabled = true;
             }
 
             if (fieldOfView != null && player != null)
             {
                 fieldOfView.SetTarget(player);
             }
+        }
+
+        private void Start()
+        {
+            if (agent == null || patrolPoints == null || patrolPoints.Length == 0)
+                return;
+
+            if (!agent.isOnNavMesh)
+            {
+                agent.Warp(transform.position);
+                StartCoroutine(DelayedPatrolStart());
+                return;
+            }
 
             ChangeState(EnemyState.Patrol);
+        }
+
+        private System.Collections.IEnumerator DelayedPatrolStart()
+        {
+            yield return null;
+            if (agent.isOnNavMesh)
+            {
+                ChangeState(EnemyState.Patrol);
+            }
         }
 
         private void InitializeContext()
@@ -109,12 +130,15 @@ namespace Ninja.Gameplay.Enemy
 
         private void InitializeStates()
         {
-            patrolState = new PatrolState(context);
-            chaseState = new ChaseState(context);
-            searchState = new SearchState(context);
-            investigateState = new InvestigateState(context);
-            scanState = new ScanState(context);
-            returnState = new ReturnState(context);
+            stateInstances = new Dictionary<EnemyState, EnemyStateBase>
+            {
+                { EnemyState.Patrol, new PatrolState(context) },
+                { EnemyState.Chase, new ChaseState(context) },
+                { EnemyState.Search, new SearchState(context) },
+                { EnemyState.Investigate, new InvestigateState(context) },
+                { EnemyState.Scan, new ScanState(context) },
+                { EnemyState.Return, new ReturnState(context) }
+            };
         }
 
         private void FixedUpdate()
@@ -143,7 +167,7 @@ namespace Ninja.Gameplay.Enemy
 
             Vector3 direction = agent.desiredVelocity;
 
-            if (direction.magnitude > 0.1f)
+            if (direction.magnitude > MOVEMENT_THRESHOLD)
             {
                 float targetAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                 float currentAngle = transform.eulerAngles.z;
@@ -167,13 +191,8 @@ namespace Ninja.Gameplay.Enemy
 
         private void OnNoiseDetected(Vector3 noisePos)
         {
-            // Уведомляем GameManager о том, что игрок был услышан
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.NotifyPlayerHeard(noisePos);
-            }
+            GameManager.Instance?.NotifyPlayerHeard(noisePos);
 
-            // Если уже в погоне, не переключаемся на исследование
             if (currentStateType == EnemyState.Chase)
             {
                 OnPlayerDetected();
@@ -191,63 +210,43 @@ namespace Ninja.Gameplay.Enemy
         {
             if (currentStateType != EnemyState.Chase)
             {
-                // Уведомляем GameManager о том, что игрок был обнаружен
-                if (GameManager.Instance != null)
-                {
-                    GameManager.Instance.NotifyPlayerFound();
-                }
-
+                GameManager.Instance?.NotifyPlayerFound();
                 ChangeState(EnemyState.Chase);
             }
         }
 
         private void CheckPlayerCatch()
         {
-            if (playerCaughtTriggered)
+            if (playerCaughtTriggered || player == null)
                 return;
 
             float distanceToPlayer = Vector3.Distance(transform.position, player.position);
-            if (distanceToPlayer < 1.2f)
+            if (distanceToPlayer < CATCH_DISTANCE_THRESHOLD)
             {
                 playerCaughtTriggered = true;
-                if (GameManager.Instance != null)
-                {
-                    GameManager.Instance.NotifyPlayerCatched();
-                }
+                GameManager.Instance?.NotifyPlayerCatched();
             }
         }
 
         private void ChangeState(EnemyState newState)
         {
-            if (currentStateType == newState)
+            if (currentStateType == newState && hasInitializedState)
                 return;
 
             currentState?.Exit();
             currentStateType = newState;
 
-            switch (newState)
+            if (stateInstances != null && stateInstances.TryGetValue(newState, out EnemyStateBase nextState))
             {
-                case EnemyState.Patrol:
-                    currentState = patrolState;
-                    break;
-                case EnemyState.Chase:
-                    currentState = chaseState;
-                    break;
-                case EnemyState.Search:
-                    currentState = searchState;
-                    break;
-                case EnemyState.Investigate:
-                    currentState = investigateState;
-                    break;
-                case EnemyState.Scan:
-                    currentState = scanState;
-                    break;
-                case EnemyState.Return:
-                    currentState = returnState;
-                    break;
+                currentState = nextState;
+            }
+            else
+            {
+                return;
             }
 
             state = newState;
+            hasInitializedState = true;
             currentState?.Enter();
         }
         #endregion
