@@ -1,68 +1,54 @@
-using Ninja.Systems;
 using UnityEngine;
 using UnityEngine.UI;
+using Ninja.Systems;
 
 namespace Ninja.UI.Gameplay
 {
     public class PauseMenu : MenuBase
     {
-        [Header("References")]
         [SerializeField] private MenuBase settingsMenu;
         [SerializeField] private MenuBase quitMenu;
-
-        [Header("Components")]
         [SerializeField] private Button resumeButton;
         [SerializeField] private Button settingsButton;
         [SerializeField] private Button quitButton;
 
         protected override void Awake()
         {
-            resumeButton.onClick.AddListener(OnResumeButton);
-            settingsButton.onClick.AddListener(OnSettingsButton);
-            quitButton.onClick.AddListener(OnQuitButton);
-
+            resumeButton?.onClick.AddListener(Close);
+            settingsButton?.onClick.AddListener(OpenSettings);
+            quitButton?.onClick.AddListener(OpenQuit);
             base.Awake();
         }
 
         private void OnEnable()
         {
-            if (!GameManager.Instance.IsPaused)
+            if (GameManager.Instance && !GameManager.Instance.IsPaused)
                 GameManager.Instance.TogglePause();
-
-            UIController.Instance.FocusMenu(this);
+            UIController.Instance?.FocusMenu(this);
         }
 
         private void OnDisable()
         {
-            if (GameManager.Instance.IsPaused)
+            if (GameManager.Instance && GameManager.Instance.IsPaused)
                 GameManager.Instance.TogglePause();
-
-            UIController.Instance.UnfocusMenu(this);
+            UIController.Instance?.UnfocusMenu(this);
         }
 
-        private void OnResumeButton()
+        private void OpenSettings()
         {
-            Close();
+            settingsMenu?.Open();
+            UIController.Instance?.FocusMenu(settingsMenu);
         }
 
-        private void OnSettingsButton()
+        private void OpenQuit()
         {
-            settingsMenu.Open();
-            UIController.Instance.FocusMenu(settingsMenu);
-        }
-
-        private void OnQuitButton()
-        {
-            quitMenu.Open();
-            UIController.Instance.FocusMenu(quitMenu);
+            quitMenu?.Open();
+            UIController.Instance?.FocusMenu(quitMenu);
         }
 
         public override void OnEscPressed()
         {
-            if (!IsFocused)
-                return;
-
-            Close();
+            if (IsFocused) Close();
         }
     }
 }

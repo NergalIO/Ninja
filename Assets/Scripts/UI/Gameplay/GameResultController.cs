@@ -1,52 +1,32 @@
 using UnityEngine;
 using Ninja.Systems;
-
-
+using Ninja.Core.Events;
 
 namespace Ninja.UI.Gameplay
 {
     public class GameResultController : MonoBehaviour
     {
-        [Header("Preferences")]
-        [SerializeField] private GameObject background;
         [SerializeField] private LoseWonMenu loseWonWindow;
 
-        public void Start()
+        private void Start()
         {
-            if (GameManager.Instance == null)
-                return;
-
-            GameManager.Instance.OnPlayerCatched += PlayerCatched;
-            GameManager.Instance.OnPlayerEscapeTrigger += PlayerWin;
+            Events.Subscribe(GameEvents.PlayerCaught, OnPlayerCaught);
+            Events.Subscribe(GameEvents.PlayerEscaped, OnPlayerEscaped);
         }
 
         private void OnDestroy()
         {
-            if (GameManager.Instance == null)
-                return;
-
-            GameManager.Instance.OnPlayerCatched -= PlayerCatched;
-            GameManager.Instance.OnPlayerEscapeTrigger -= PlayerWin;
+            Events.Unsubscribe(GameEvents.PlayerCaught, OnPlayerCaught);
+            Events.Unsubscribe(GameEvents.PlayerEscaped, OnPlayerEscaped);
         }
 
-        public void PlayerCatched()
-        {
-            OpenLoseWonWindow(false);
-        }
+        private void OnPlayerCaught(EventArgs _) => ShowResult(false);
+        private void OnPlayerEscaped(EventArgs _) => ShowResult(true);
 
-        public void PlayerWin()
+        private void ShowResult(bool won)
         {
-            OpenLoseWonWindow(true);
-        }
-
-        public void OpenLoseWonWindow(bool isWon)
-        {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.PauseGame();
-            }
-
-            loseWonWindow.isWon = isWon;
+            GameManager.Instance?.Pause();
+            loseWonWindow.isWon = won;
             loseWonWindow.UpdateStatistics();
             loseWonWindow.Open();
         }

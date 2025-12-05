@@ -1,15 +1,14 @@
 using UnityEngine;
-using Keyboard;
 using UnityEngine.InputSystem;
-
 using Ninja.Core;
-
+using Keyboard;
 
 namespace Ninja.Input
 {
     public class UIInputController : PersistentSingleton<UIInputController>, KeyboardBinds.IUIActions
     {
-        private KeyboardBinds _inputActions;
+        private KeyboardBinds inputActions;
+        private bool escPressed;
 
         public Vector2 Navigate { get; private set; }
         public bool Submit { get; private set; }
@@ -21,101 +20,47 @@ namespace Ninja.Input
         public Vector2 ScrollWheel { get; private set; }
         public Vector3 TrackedDevicePosition { get; private set; }
         public Quaternion TrackedDeviceOrientation { get; private set; }
-        private bool escReleasedFrame;
-        public bool EscMenu 
+
+        public bool EscMenu
         {
-            get 
-            { 
-                bool tmp = escReleasedFrame;
-                escReleasedFrame = false;
-                return tmp;
-            }
-            private set 
-            { 
-                escReleasedFrame = value; 
+            get
+            {
+                bool val = escPressed;
+                escPressed = false;
+                return val;
             }
         }
 
         protected override void OnSingletonInitialized()
         {
-            _inputActions = new KeyboardBinds();
-            _inputActions.UI.AddCallbacks(this);
-            _inputActions.Enable();
+            inputActions = new KeyboardBinds();
+            inputActions.UI.AddCallbacks(this);
+            inputActions.Enable();
         }
 
         private void Update()
         {
-            // Постоянно обновляем позицию мыши, так как она может не вызывать события при каждом кадре
-            if (_inputActions != null && _inputActions.UI.Point != null)
-            {
-                Point = _inputActions.UI.Point.ReadValue<Vector2>();
-            }
+            if (inputActions?.UI.Point != null)
+                Point = inputActions.UI.Point.ReadValue<Vector2>();
         }
 
         protected override void OnDestroy()
         {
-            if (_inputActions != null)
-            {
-                _inputActions.UI.RemoveCallbacks(this);
-                _inputActions.Dispose();
-            }
+            inputActions?.UI.RemoveCallbacks(this);
+            inputActions?.Dispose();
             base.OnDestroy();
         }
 
-        public void OnNavigate(InputAction.CallbackContext context)
-        {
-            Navigate = context.ReadValue<Vector2>();
-        }
-
-        public void OnSubmit(InputAction.CallbackContext context)
-        {
-            Submit = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnCancel(InputAction.CallbackContext context)
-        {
-            Cancel = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnPoint(InputAction.CallbackContext context)
-        {
-            Point = context.ReadValue<Vector2>();
-        }
-
-        public void OnClick(InputAction.CallbackContext context)
-        {
-            Click = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnRightClick(InputAction.CallbackContext context)
-        {
-            RightClick = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnMiddleClick(InputAction.CallbackContext context)
-        {
-            MiddleClick = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnScrollWheel(InputAction.CallbackContext context)
-        {
-            ScrollWheel = context.ReadValue<Vector2>();
-        }
-
-        public void OnTrackedDevicePosition(InputAction.CallbackContext context)
-        {
-            TrackedDevicePosition = context.ReadValue<Vector3>();
-        }
-
-        public void OnTrackedDeviceOrientation(InputAction.CallbackContext context)
-        {
-            TrackedDeviceOrientation = context.ReadValue<Quaternion>();
-        }
-
-        public void OnESCMenu(InputAction.CallbackContext context)
-        {
-            EscMenu = context.canceled;
-        }
+        public void OnNavigate(InputAction.CallbackContext ctx) => Navigate = ctx.ReadValue<Vector2>();
+        public void OnSubmit(InputAction.CallbackContext ctx) => Submit = ctx.ReadValue<float>() > 0.5f;
+        public void OnCancel(InputAction.CallbackContext ctx) => Cancel = ctx.ReadValue<float>() > 0.5f;
+        public void OnPoint(InputAction.CallbackContext ctx) => Point = ctx.ReadValue<Vector2>();
+        public void OnClick(InputAction.CallbackContext ctx) => Click = ctx.ReadValue<float>() > 0.5f;
+        public void OnRightClick(InputAction.CallbackContext ctx) => RightClick = ctx.ReadValue<float>() > 0.5f;
+        public void OnMiddleClick(InputAction.CallbackContext ctx) => MiddleClick = ctx.ReadValue<float>() > 0.5f;
+        public void OnScrollWheel(InputAction.CallbackContext ctx) => ScrollWheel = ctx.ReadValue<Vector2>();
+        public void OnTrackedDevicePosition(InputAction.CallbackContext ctx) => TrackedDevicePosition = ctx.ReadValue<Vector3>();
+        public void OnTrackedDeviceOrientation(InputAction.CallbackContext ctx) => TrackedDeviceOrientation = ctx.ReadValue<Quaternion>();
+        public void OnESCMenu(InputAction.CallbackContext ctx) => escPressed = ctx.canceled;
     }
 }
-

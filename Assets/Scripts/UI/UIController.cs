@@ -1,17 +1,13 @@
 using UnityEngine;
 using Ninja.Core;
 using Ninja.Input;
-using Ninja.UI.Menu;
 using Ninja.UI.Gameplay;
 
 namespace Ninja.UI
 {
     public class UIController : PersistentSingleton<UIController>
     {
-        [Header("References")]
         [SerializeField] private MenuBase pauseMenu;
-
-        [Header("Debug")]
         [SerializeField] private MenuBase previousMenu;
         [SerializeField] private MenuBase focusedMenu;
 
@@ -19,41 +15,25 @@ namespace Ninja.UI
 
         public void FocusMenu(MenuBase menu)
         {
-            if (menu == null)
-                return;
+            if (menu == null || focusedMenu == menu) return;
 
-            // Не меняем, если пытаемся сфокусировать то же самое
-            if (focusedMenu == menu)
-                return;
-
-            // Если есть фокус, сохраняем его как previous
             if (focusedMenu != null)
+            {
                 previousMenu = focusedMenu;
-
-            // Снимаем фокус с предыдущего (если требуется)
-            if (focusedMenu != null && focusedMenu.CloseOnFocusLost)
-                focusedMenu.Close();
+                if (focusedMenu.CloseOnFocusLost)
+                    focusedMenu.Close();
+            }
 
             focusedMenu = menu;
-
-            // Если меню закрыто — открываем
             if (focusedMenu.CurrentState == MenuBase.MenuState.Closed)
                 focusedMenu.Open();
         }
 
         public void UnfocusMenu(MenuBase menu)
         {
-            if (menu == null)
-                return;
+            if (menu == null || focusedMenu != menu) return;
 
-            // Если снимаем фокус не с текущего меню — игнорируем
-            if (focusedMenu != menu)
-                return;
-
-            // Снимаем фокус
             focusedMenu = null;
-
-            // Если есть предыдущее меню — ставим в фокус его
             if (previousMenu != null)
             {
                 FocusMenu(previousMenu);
@@ -63,17 +43,12 @@ namespace Ninja.UI
 
         private void Update()
         {
-            if (!UIInputController.Instance.EscMenu)
-                return;
+            if (!UIInputController.Instance.EscMenu) return;
 
             if (focusedMenu == null)
             {
-                if (pauseMenu == null)
-                    pauseMenu = FindAnyObjectByType<PauseMenu>(FindObjectsInactive.Include);
-
-                if (pauseMenu != null)
-                    pauseMenu.Open();
-
+                pauseMenu ??= FindAnyObjectByType<PauseMenu>(FindObjectsInactive.Include);
+                pauseMenu?.Open();
                 return;
             }
 

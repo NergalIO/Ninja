@@ -1,197 +1,263 @@
+using System.Collections.Generic;
 using UnityEngine;
-using Ninja.Input;
+
+using Ninja.Core.Events;
 using Ninja.Gameplay.Interaction;
-using Ninja.Core;
+using Ninja.Input;
 
 namespace Ninja.Gameplay.Player
 {
-    [RequireComponent(typeof(PlayerInputController))]
+    /// <summary>
+    /// Контроллер взаимодействия игрока с интерактивными объектами
+    /// </summary>
     public class PlayerInteractionController : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private PlayerInputController inputController;
-        [SerializeField] private Transform interactionPoint;
-
-        [Header("Settings")]
-        [SerializeField] private float interactionRange = 2f;
-        [SerializeField] private LayerMask interactionLayer = -1;
-        [SerializeField] private bool showDebugGizmos = true;
-        [SerializeField] private float facingAngleThreshold = 90f;
-        [SerializeField] private bool debugLog = false;
         
-        [Header("Gizmos Settings")]
-        [SerializeField] private float facingDirectionLineLength = 1.5f;
-        [SerializeField] private Color facingDirectionColor = Color.blue;
-        [SerializeField] private Color facingSectorColor = new Color(0f, 1f, 1f, 0.3f);
-
+        [Header("Detection Settings")]
+        [SerializeField] private float detectionRadius = 1.5f;
+        [SerializeField] private LayerMask interactableLayer = -1;
+        [SerializeField, Range(0f, 360f)] private float viewAngle = 120f;
+        [SerializeField] private bool requireLineOfSight = true;
+        
+        [Header("Debug")]
+        [SerializeField] private bool showDebugGizmos = true;
+        [SerializeField] private bool showDebugLogs = false;
+        [SerializeField] private Color gizmoColor = new Color(0f, 1f, 0f, 0.3f);
+        
         private IInteractable currentInteractable;
-        private InteractableOutline currentOutline;
-
+        private readonly List<IInteractable> interactablesInRange = new();
+        private readonly Collider2D[] colliderBuffer = new Collider2D[16];
+        
+        /// <summary>
+        /// Текущий интерактивный объект в фокусе
+        /// </summary>
+        public IInteractable CurrentInteractable => currentInteractable;
+        
+        /// <summary>
+        /// Есть ли объект для взаимодействия
+        /// </summary>
+        public bool HasInteractable => currentInteractable != null && currentInteractable.CanInteract;
+        
+        /// <summary>
+        /// Подсказка текущего интерактивного объекта
+        /// </summary>
+        public string CurrentHint => currentInteractable?.InteractionHint ?? string.Empty;
+        
         private void Awake()
         {
             if (inputController == null)
-            {
+                inputController = GetComponentInChildren<PlayerInputController>();
+            
+            if (inputController == null)
+                inputController = GetComponentInParent<PlayerInputController>();
+            
+            if (inputController == null)
                 inputController = GetComponent<PlayerInputController>();
-            }
-
-            if (interactionPoint == null)
-            {
-                interactionPoint = transform;
-            }
+                
+            if (inputController == null)
+                Debug.LogError($"[PlayerInteractionController] PlayerInputController не найден на {gameObject.name}! " +
+                    "Назначьте его вручную в инспекторе.", this);
         }
-
+        
         private void Update()
         {
-            CheckForInteractables();
+            DetectInteractables();
+            UpdateCurrentInteractable();
             HandleInteraction();
         }
-
-        private void CheckForInteractables()
+        
+        private void DetectInteractables()
         {
-            Collider2D[] colliders = Physics2D.OverlapCircleAll(
-                interactionPoint.position,
-                interactionRange,
-                interactionLayer
+            interactablesInRange.Clear();
+            
+            int count = Physics2D.OverlapCircleNonAlloc(
+                transform.position, 
+                detectionRadius, 
+                colliderBuffer, 
+                interactableLayer
             );
-
-            IInteractable nearestInteractable = null;
-            InteractableOutline nearestOutline = null;
-            float nearestDistance = float.MaxValue;
-
-            foreach (Collider2D collider in colliders)
+            
+            for (int i = 0; i < count; i++)
             {
-                IInteractable interactable = collider.GetComponent<IInteractable>();
-                if (interactable == null)
+                var interactable = colliderBuffer[i].GetComponent<IInteractable>();
+                if (interactable != null && interactable.CanInteract)
                 {
-                    if (debugLog)
-                        Debug.Log($"[Interaction] Объект {collider.name} не имеет компонента IInteractable");
-                    continue;
+                    interactablesInRange.Add(interactable);
                 }
-
-                if (!interactable.CanInteract(transform))
-                {
-                    if (debugLog)
-                        Debug.Log($"[Interaction] Объект {collider.name} не может взаимодействовать (дистанция или состояние)");
+            }
+        }
+        
+        private void UpdateCurrentInteractable()
+        {
+            IInteractable closest = null;
+            float closestDistance = float.MaxValue;
+            
+            Vector2 playerForward = transform.right; // В 2D "вперёд" часто это right
+            float halfViewAngle = viewAngle * 0.5f;
+            
+            foreach (var interactable in interactablesInRange)
+            {
+                if (interactable?.Transform == null)
                     continue;
-                }
-
-                if (!IsFacingObject(collider.transform))
-                {
-                    if (debugLog)
-                        Debug.Log($"[Interaction] Игрок не смотрит на объект {collider.name}");
-                    continue;
-                }
-
-                float distance = Vector2.Distance(interactionPoint.position, collider.transform.position);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestInteractable = interactable;
-                    nearestOutline = collider.GetComponent<InteractableOutline>();
                     
-                    if (debugLog)
-                        Debug.Log($"[Interaction] Найден интерактивный объект: {collider.name}, расстояние: {distance}, обводка: {(nearestOutline != null ? "есть" : "нет")}");
+                Vector2 toInteractable = (Vector2)interactable.Transform.position - (Vector2)transform.position;
+                float distance = toInteractable.magnitude;
+                
+                if (distance < 0.01f)
+                    continue;
+                
+                // Проверяем угол обзора
+                if (requireLineOfSight)
+                {
+                    float dot = Vector2.Dot(playerForward, toInteractable.normalized);
+                    float angle = Mathf.Acos(dot) * Mathf.Rad2Deg;
+                    
+                    // Если объект вне угла обзора - пропускаем
+                    if (angle > halfViewAngle)
+                        continue;
+                }
+                
+                // Выбираем ближайший объект
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    closest = interactable;
                 }
             }
             
-            if (debugLog && colliders.Length > 0 && nearestInteractable == null)
+            if (closest != currentInteractable)
             {
-                Debug.Log($"[Interaction] Найдено {colliders.Length} коллайдеров, но ни один не прошел проверки");
-            }
-
-            if (currentOutline != null && currentOutline != nearestOutline)
-            {
-                currentOutline.HideOutline();
-            }
-
-            currentInteractable = nearestInteractable;
-            currentOutline = nearestOutline;
-
-            if (currentOutline != null)
-            {
-                currentOutline.ShowOutline();
-            }
-        }
-
-        private bool IsFacingObject(Transform target)
-        {
-            Vector2 directionToTarget = (target.position - transform.position).normalized;
-
-            float playerAngle = transform.eulerAngles.z * Mathf.Deg2Rad;
-            Vector2 playerForward = new Vector2(Mathf.Cos(playerAngle), Mathf.Sin(playerAngle));
-
-            float dotProduct = Vector2.Dot(playerForward, directionToTarget);
-            float angle = Mathf.Acos(Mathf.Clamp(dotProduct, -1f, 1f)) * Mathf.Rad2Deg;
-
-            return angle <= facingAngleThreshold;
-        }
-
-        private void HandleInteraction()
-        {
-            if (inputController.IsInteractPressed)
-            {
-                if (currentInteractable == null)
+                if (currentInteractable != null)
                 {
-                    if (debugLog)
-                        Debug.Log("[Interaction] Нажата E, но нет текущего объекта взаимодействия");
-                    return;
+                    currentInteractable.OnUnfocus(gameObject);
+                    TriggerInteractionEvent(GameEvents.InteractionUnfocused, currentInteractable);
                 }
                 
-                MonoBehaviour interactableMono = currentInteractable as MonoBehaviour;
-                if (interactableMono != null && IsFacingObject(interactableMono.transform))
+                currentInteractable = closest;
+                
+                if (currentInteractable != null)
                 {
-                    if (debugLog)
-                        Debug.Log($"[Interaction] Взаимодействие с {interactableMono.name}");
-                    currentInteractable.Interact(transform);
-                }
-                else if (debugLog)
-                {
-                    Debug.Log($"[Interaction] Не удалось взаимодействовать с объектом");
+                    currentInteractable.OnFocus(gameObject);
+                    TriggerInteractionEvent(GameEvents.InteractionFocused, currentInteractable);
                 }
             }
         }
-
-        public IInteractable GetCurrentInteractable()
+        
+        private bool wasInteracting = false;
+        
+        private void HandleInteraction()
         {
-            return currentInteractable;
-        }
+            if (inputController == null)
+                return;
+            
+            bool interactInput = inputController.IsInteracting && !wasInteracting;
+            wasInteracting = isInteracting;
+            
+            if (showDebugLogs && interactInput)
+                Debug.Log($"[PlayerInteractionController] Interact input! Current: {currentInteractable?.Transform?.name ?? "none"}");
 
-        private void OnDrawGizmos()
+            if (interactInput && currentInteractable != null && currentInteractable.CanInteract)
+            {
+                if (showDebugLogs)
+                    Debug.Log($"[PlayerInteractionController] Interacting with {currentInteractable.Transform.name}");
+                    
+                currentInteractable.OnInteract(gameObject);
+                TriggerInteractionEvent(GameEvents.InteractionPerformed, currentInteractable);
+            }
+        }
+        
+        private void TriggerInteractionEvent(string eventName, IInteractable interactable)
+        {
+            var args = new InteractionEventArgs(
+                gameObject,
+                interactable?.Transform?.gameObject,
+                interactable?.InteractionHint
+            );
+            Events.Trigger(eventName, args);
+        }
+        
+        /// <summary>
+        /// Принудительно взаимодействовать с указанным объектом
+        /// </summary>
+        public void ForceInteract(IInteractable interactable)
+        {
+            if (interactable != null && interactable.CanInteract)
+            {
+                interactable.OnInteract(gameObject);
+                TriggerInteractionEvent(GameEvents.InteractionPerformed, interactable);
+            }
+        }
+        
+        /// <summary>
+        /// Очистить текущий интерактивный объект
+        /// </summary>
+        public void ClearCurrentInteractable()
+        {
+            if (currentInteractable != null)
+            {
+                currentInteractable.OnUnfocus(gameObject);
+                TriggerInteractionEvent(GameEvents.InteractionUnfocused, currentInteractable);
+                currentInteractable = null;
+            }
+        }
+        
+#if UNITY_EDITOR
+        private void OnDrawGizmosSelected()
         {
             if (!showDebugGizmos)
                 return;
-
-            Vector3 point = interactionPoint != null ? interactionPoint.position : transform.position;
             
-            Gizmos.color = currentInteractable != null ? Color.green : Color.cyan;
-            Gizmos.DrawWireSphere(point, interactionRange);
-
-            DrawFacingDirection(point);
-            DrawFacingSector(point);
-        }
-
-        private void DrawFacingDirection(Vector3 origin)
-        {
-            float playerAngle = transform.eulerAngles.z * Mathf.Deg2Rad;
-            Vector2 playerForward = new Vector2(Mathf.Cos(playerAngle), Mathf.Sin(playerAngle));
+            Vector3 pos = transform.position;
+            Vector3 forward = transform.right;
             
-            Vector3 direction = new Vector3(playerForward.x, playerForward.y, 0);
-            Vector3 endPoint = origin + direction * facingDirectionLineLength;
-
-            Gizmos.color = facingDirectionColor;
-            Gizmos.DrawLine(origin, endPoint);
-
-            GizmosUtils.DrawArrow(origin, endPoint, 0.2f);
+            // Рисуем радиус обнаружения
+            Gizmos.color = gizmoColor;
+            Gizmos.DrawWireSphere(pos, detectionRadius);
+            
+            // Рисуем угол обзора
+            if (requireLineOfSight)
+            {
+                Gizmos.color = new Color(0f, 0.5f, 1f, 0.5f);
+                float halfAngle = viewAngle * 0.5f * Mathf.Deg2Rad;
+                
+                Vector3 rightDir = new Vector3(
+                    forward.x * Mathf.Cos(halfAngle) - forward.y * Mathf.Sin(halfAngle),
+                    forward.x * Mathf.Sin(halfAngle) + forward.y * Mathf.Cos(halfAngle),
+                    0
+                );
+                Vector3 leftDir = new Vector3(
+                    forward.x * Mathf.Cos(-halfAngle) - forward.y * Mathf.Sin(-halfAngle),
+                    forward.x * Mathf.Sin(-halfAngle) + forward.y * Mathf.Cos(-halfAngle),
+                    0
+                );
+                
+                Gizmos.DrawLine(pos, pos + rightDir * detectionRadius);
+                Gizmos.DrawLine(pos, pos + leftDir * detectionRadius);
+                
+                // Дуга
+                int segments = 20;
+                float angleStep = viewAngle / segments * Mathf.Deg2Rad;
+                float startAngle = Mathf.Atan2(forward.y, forward.x) - halfAngle;
+                
+                for (int i = 0; i < segments; i++)
+                {
+                    float a1 = startAngle + angleStep * i;
+                    float a2 = startAngle + angleStep * (i + 1);
+                    Vector3 p1 = pos + new Vector3(Mathf.Cos(a1), Mathf.Sin(a1), 0) * detectionRadius;
+                    Vector3 p2 = pos + new Vector3(Mathf.Cos(a2), Mathf.Sin(a2), 0) * detectionRadius;
+                    Gizmos.DrawLine(p1, p2);
+                }
+            }
+            
+            // Линия к текущему объекту
+            if (currentInteractable?.Transform != null)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawLine(pos, currentInteractable.Transform.position);
+            }
         }
-
-        private void DrawFacingSector(Vector3 origin)
-        {
-            float playerAngle = transform.eulerAngles.z;
-            float halfAngle = facingAngleThreshold * 0.5f;
-
-            Gizmos.color = facingSectorColor;
-            GizmosUtils.DrawSector(origin, interactionRange, playerAngle, facingAngleThreshold, 20);
-        }
+#endif
     }
 }
-У

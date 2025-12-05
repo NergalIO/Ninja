@@ -1,252 +1,82 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
-using Ninja.Core;
-using Data = Ninja.Systems.Data;
-using LevelData = Ninja.Systems.Data.LevelData;
-using Ninja.Gameplay.Levels;
 using UnityEngine.SceneManagement;
+using Ninja.Core;
+using Ninja.Core.Events;
 
-
-namespace Ninja.Systems {
-    public class GameManager : PersistentSingleton<GameManager> {
-        [Header("Pause Settings")]
+namespace Ninja.Systems
+{
+    /// <summary>
+    /// Главный менеджер игры - управляет паузой и временем уровня
+    /// </summary>
+    public class GameManager : PersistentSingleton<GameManager>
+    {
         [SerializeField] private bool pauseOnStart = false;
 
-        private bool isPaused = false;
-        private float previousTimeScale = 1f;
-        private Data.LevelDataCollector dataCollector = new Data.LevelDataCollector();
-        private float levelStartTime = 0f;
+        private bool isPaused;
+        private float savedTimeScale = 1f;
+        private float levelStartTime;
 
         public bool IsPaused => isPaused;
-        public Data.LevelDataCollector DataCollector => dataCollector;
-        public float LevelStartTime => levelStartTime;
-        public float CurrentLevelTime => Time.time - levelStartTime;
-
+        public float LevelTime => Time.time - levelStartTime;
         public string CurrentScene => SceneManager.GetActiveScene().name;
 
-        // Game state events
-        public event Action OnGamePaused;
-        public event Action OnGameResumed;
-
-        // Gameplay events
-        public event Action OnPlayerEscapeTrigger;
-        public event Action OnPlayerCatched;
-        public event Action OnPlayerFound;
-        public event Action<Vector3> OnPlayerHeard;
-
-        protected override void OnSingletonInitialized() {
+        protected override void OnSingletonInitialized()
+        {
             base.OnSingletonInitialized();
-            
-            dataCollector.LoadData();
-            
-            OnPlayerCatched += HandlePlayerCatched;
-            OnPlayerFound += HandlePlayerFound;
-            OnPlayerEscapeTrigger += HandlePlayerEscape;
-            
             SceneManager.sceneLoaded += OnSceneLoaded;
+            InitLevel();
             
-            InitializeCurrentLevel();
-            
-            if (pauseOnStart) {
-                PauseGame();
-            } else {
-                ResumeGame();
-            }
-        }
-
-        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            InitializeCurrentLevel();
-        }
-
-        private void InitializeCurrentLevel()
-        {
-            string sceneName = SceneManager.GetActiveScene().name;
-            if (sceneName != "Menu" && !string.IsNullOrEmpty(sceneName))
-            {
-                SetCurrentLevel(sceneName);
-            }
+            if (pauseOnStart) Pause();
+            else Resume();
         }
 
         protected override void OnDestroy()
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            
-            if (!string.IsNullOrEmpty(CurrentScene) && CurrentScene != "Menu")
-            {
-                dataCollector.SaveData();
-            }
-            
             base.OnDestroy();
-            OnPlayerCatched -= HandlePlayerCatched;
-            OnPlayerFound -= HandlePlayerFound;
-            OnPlayerEscapeTrigger -= HandlePlayerEscape;
         }
 
-        private void OnApplicationQuit()
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) => InitLevel();
+
+        private void InitLevel()
         {
-            if (!string.IsNullOrEmpty(CurrentScene) && CurrentScene != "Menu")
-            {
-                dataCollector.SaveData();
-            }
+            if (CurrentScene == "Menu" || string.IsNullOrEmpty(CurrentScene))
+                return;
+
+            levelStartTime = Time.time;
+            Events.Trigger(GameEvents.LevelStarted, new LevelEventArgs(CurrentScene));
         }
 
-        public void PauseGame() {
-            if (isPaused) {
-                return;
-            }
+        public void Pause()
+        {
+            if (isPaused) return;
 
-            previousTimeScale = Time.timeScale;
+            savedTimeScale = Time.timeScale;
             Time.timeScale = 0f;
             isPaused = true;
-            OnGamePaused?.Invoke();
+            Events.Trigger(GameEvents.GamePaused);
         }
 
-        public void ResumeGame() {
-            if (!isPaused) {
-                return;
-            }
+        public void Resume()
+        {
+            if (!isPaused) return;
 
-            Time.timeScale = previousTimeScale;
+            Time.timeScale = savedTimeScale;
             isPaused = false;
-            OnGameResumed?.Invoke();
+            Events.Trigger(GameEvents.GameResumed);
         }
 
-        public void TogglePause() {
-            if (isPaused) {
-                ResumeGame();
-            } else {
-                PauseGame();
-            }
-        }
-
-        public void SetTimeScale(float timeScale) {
-            if (isPaused) {
-                previousTimeScale = Mathf.Clamp(timeScale, 0f, 1f);
-            } else {
-                Time.timeScale = Mathf.Clamp(timeScale, 0f, 1f);
-            }
-        }
-
-        #region Level Data Collection
-        public void SetCurrentLevel(string levelId)
+        public void TogglePause()
         {
-            dataCollector.SetCurrentLevel(levelId);
-            levelStartTime = Time.time;
+            if (isPaused) Resume();
+            else Pause();
         }
 
-        public void SetPlayerTransform(Transform player)
+        public void SetTimeScale(float scale)
         {
-            dataCollector.SetPlayerTransform(player);
+            scale = Mathf.Clamp01(scale);
+            if (isPaused) savedTimeScale = scale;
+            else Time.timeScale = scale;
         }
-
-        public void NotifyPlayerHeard(Vector3 noisePosition)
-        {
-            dataCollector.RecordPlayerHeard(noisePosition);
-            OnPlayerHeard?.Invoke(noisePosition);
-        }
-
-        public void NotifyPlayerFound()
-        {
-            OnPlayerFound?.Invoke();
-        }
-
-        public void NotifyPlayerCatched()
-        {
-            OnPlayerCatched?.Invoke();
-        }
-
-        public void NotifyPlayerEscape()
-        {
-            OnPlayerEscapeTrigger?.Invoke();
-        }
-
-        private void HandlePlayerCatched()
-        {
-            dataCollector.RecordPlayerCaught();
-            dataCollector.SaveData();
-        }
-
-        private void HandlePlayerFound()
-        {
-            dataCollector.RecordPlayerDetected();
-        }
-
-        private void HandlePlayerEscape()
-        {
-            dataCollector.RecordPlayerEscape();
-            dataCollector.SaveData();
-        }
-
-        public void SaveLevelData()
-        {
-            dataCollector.SaveData();
-        }
-
-        public void LoadLevelData()
-        {
-            dataCollector.LoadData();
-        }
-
-        public static LevelData GetLevelData(string levelId)
-        {
-            if (Instance != null)
-            {
-                return Instance.dataCollector.GetLevelData(levelId);
-            }
-            return null;
-        }
-
-        public static LevelData GetCurrentLevelData()
-        {
-            if (Instance != null)
-            {
-                return Instance.dataCollector.GetCurrentLevelData();
-            }
-            return null;
-        }
-
-        public static IReadOnlyDictionary<string, LevelData> GetAllLevelData()
-        {
-            if (Instance != null)
-            {
-                return Instance.dataCollector.GetAllLevelData();
-            }
-            return new Dictionary<string, LevelData>();
-        }
-
-        public static int GetLevelTimesPlayed(string levelId)
-        {
-            var data = GetLevelData(levelId);
-            return data?.TimesPlayed ?? 0;
-        }
-
-        public static int GetLevelTimesCaught(string levelId)
-        {
-            var data = GetLevelData(levelId);
-            return data?.TimesCaught ?? 0;
-        }
-
-        public static int GetLevelTimesDetected(string levelId)
-        {
-            var data = GetLevelData(levelId);
-            return data?.TimesDetected ?? 0;
-        }
-
-        public static int GetLevelTimesHeard(string levelId)
-        {
-            var data = GetLevelData(levelId);
-            return data?.TimesHeard ?? 0;
-        }
-
-        public static int GetLevelTimesCompleted(string levelId)
-        {
-            var data = GetLevelData(levelId);
-            return data?.TimesCompleted ?? 0;
-        }
-        #endregion
     }
 }
-
-

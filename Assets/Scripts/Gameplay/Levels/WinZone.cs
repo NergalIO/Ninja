@@ -1,5 +1,5 @@
 using UnityEngine;
-using Ninja.Systems;
+using Ninja.Core.Events;
 using Ninja.Gameplay.Player;
 
 namespace Ninja.Gameplay.Levels
@@ -10,9 +10,8 @@ namespace Ninja.Gameplay.Levels
         {
             if (other.CompareTag("Player") || other.GetComponent<MovementController>() != null)
             {
-                GameManager.Instance?.NotifyPlayerEscape();
+                Events.Trigger(GameEvents.PlayerEscaped);
             }
         }
     }
 }
-

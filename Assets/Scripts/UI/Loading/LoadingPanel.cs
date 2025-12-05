@@ -1,107 +1,77 @@
 using System.Collections;
-
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-
 
 namespace Ninja.UI.Loading
 {
     public class LoadingPanel : MenuBase
     {
-        [Header("References")]
         [SerializeField] private Slider progressBar;
-
-        [Header("Hint Properties")]
-        [SerializeField] private Hints LoadingHints;
+        [SerializeField] private Hints hints;
         [SerializeField] private TMP_Text hintText;
-        [SerializeField] private float hintUpdateInterval = 5f;
-        [SerializeField] private float hintLastUpdateTime = 0f;
+        [SerializeField] private float hintInterval = 5f;
 
-        [Header("Background Properties")]
-        [SerializeField] private Backgrounds LoadingBackgrounds;
+        [SerializeField] private Backgrounds backgrounds;
         [SerializeField] private Image backgroundImage;
-        [SerializeField] private float backgroundUpdateInterval = 5f;
-        [SerializeField] private float backgroundLastUpdateTime = 0f;
+        [SerializeField] private float bgInterval = 5f;
         [SerializeField] private float fadeDuration = 1f;
 
-        private Coroutine backgroundFadeCoroutine;
+        private float lastHintTime;
+        private float lastBgTime;
+        private Coroutine fadeCoroutine;
 
         public void OnProgress(float progress)
         {
-            SetProgress(progress);
-
-            if (Time.time - hintLastUpdateTime >= hintUpdateInterval)
-            {
-                string newHint = LoadingHints.GetRandomHint();
-                SetHint(newHint);
-                hintLastUpdateTime = Time.time;
-            }
-
-            if (Time.time - backgroundLastUpdateTime >= backgroundUpdateInterval)
-            {
-                Sprite newBackground = LoadingBackgrounds.GetRandomBackground();
-                SetBackground(newBackground);
-                backgroundLastUpdateTime = Time.time;
-            }
-        }
-
-        public void SetProgress(float progress)
-        {
             progressBar.value = progress;
-        }
 
-        public void SetHint(string hint)
-        {
-            hintText.text = hint;
-        }
-
-        public void SetBackground(Sprite background)
-        {
-            if (backgroundFadeCoroutine != null)
+            if (Time.time - lastHintTime >= hintInterval)
             {
-                StopCoroutine(backgroundFadeCoroutine);
+                hintText.text = hints?.GetRandomHint() ?? "";
+                lastHintTime = Time.time;
             }
-            backgroundFadeCoroutine = StartCoroutine(FadeBackground(background));
+
+            if (Time.time - lastBgTime >= bgInterval)
+            {
+                var bg = backgrounds?.GetRandomBackground();
+                if (bg != null) SetBackground(bg);
+                lastBgTime = Time.time;
+            }
         }
 
-        private IEnumerator FadeBackground(Sprite newBackground)
+        private void SetBackground(Sprite sprite)
         {
-            Image newBackgroundImage = Instantiate(backgroundImage, backgroundImage.transform.parent);
-            newBackgroundImage.sprite = newBackground;
-            newBackgroundImage.color = new Color(1f, 1f, 1f, 0f);
+            if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
+            fadeCoroutine = StartCoroutine(FadeBackground(sprite));
+        }
 
-            float elapsedTime = 0f;
-            while (elapsedTime < fadeDuration)
+        private IEnumerator FadeBackground(Sprite newBg)
+        {
+            var newImage = Instantiate(backgroundImage, backgroundImage.transform.parent);
+            newImage.sprite = newBg;
+            newImage.color = new Color(1, 1, 1, 0);
+
+            // Fade in new
+            float t = 0;
+            while (t < fadeDuration)
             {
-                elapsedTime += Time.deltaTime;
-                float alpha = Mathf.Clamp01(elapsedTime / fadeDuration);
-                newBackgroundImage.color = new Color(1f, 1f, 1f, alpha);
+                t += Time.deltaTime;
+                newImage.color = new Color(1, 1, 1, t / fadeDuration);
                 yield return null;
             }
-            newBackgroundImage.color = new Color(1f, 1f, 1f, 1f);
 
-            elapsedTime = 0f;
-            while (elapsedTime < fadeDuration)
+            // Fade out old
+            t = 0;
+            while (t < fadeDuration)
             {
-                elapsedTime += Time.deltaTime;
-                float alpha = Mathf.Clamp01(1f - (elapsedTime / fadeDuration));
-                backgroundImage.color = new Color(1f, 1f, 1f, alpha);
+                t += Time.deltaTime;
+                backgroundImage.color = new Color(1, 1, 1, 1 - t / fadeDuration);
                 yield return null;
             }
-            backgroundImage.color = new Color(1f, 1f, 1f, 0f);
 
-            backgroundImage.sprite = newBackground;
-            backgroundImage.color = new Color(1f, 1f, 1f, 1f);
-
-            Destroy(newBackgroundImage.gameObject);
-        }
-
-        public void Clear()
-        {
-            progressBar.value = 0f;
-            hintText.text = string.Empty;
-            backgroundImage.sprite = null;
+            backgroundImage.sprite = newBg;
+            backgroundImage.color = Color.white;
+            Destroy(newImage.gameObject);
         }
     }
 }

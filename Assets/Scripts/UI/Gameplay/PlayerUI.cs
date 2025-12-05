@@ -1,51 +1,36 @@
-using Ninja.Systems;
 using UnityEngine;
 using UnityEngine.UI;
-
+using Ninja.Systems;
 
 namespace Ninja.UI.Gameplay
 {
     public class PlayerUI : MenuBase
     {
-        [Header("References")]
-        [SerializeField] private Rigidbody2D playerRB2D;
+        [SerializeField] private Rigidbody2D playerRB;
+        [SerializeField] private Image noiseIndicator;
+        [SerializeField] private float maxVelocity = 10f;
+        [SerializeField] private float lerpSpeed = 5f;
 
-        [Header("Components")]
-        [SerializeField] private Image noiseSpitch;
-
-        [Header("Settings")]
-        [SerializeField] private float maxVelocityForAlpha = 10f;
-        [SerializeField] private float alphaLerpSpeed = 5f;
-
-        private float currentAlpha = 0f;
+        private float currentAlpha;
 
         public override void Update()
         {
-            if (GameManager.Instance.IsPaused)
+            if (GameManager.Instance && GameManager.Instance.IsPaused)
                 Close();
             base.Update();
         }
 
-        public void FixedUpdate()
-        {
-            UpdateNoiseSpitch();
-        }
+        private void FixedUpdate() => UpdateNoiseIndicator();
 
-        public void UpdateNoiseSpitch()
+        private void UpdateNoiseIndicator()
         {
-            float currentVelocityMagnitude = playerRB2D.linearVelocity.magnitude;
-            float targetAlpha = Mathf.Clamp01(currentVelocityMagnitude / maxVelocityForAlpha);
-            
-            currentAlpha = Mathf.Lerp(currentAlpha, targetAlpha, alphaLerpSpeed * Time.deltaTime);
-            
-            Color currentColor = noiseSpitch.color;
-            Color newColor = new(
-                r: currentColor.r, 
-                b: currentColor.b, 
-                g: currentColor.g, 
-                a: currentAlpha
-            );
-            noiseSpitch.color = newColor;
+            if (playerRB == null || noiseIndicator == null) return;
+
+            float target = Mathf.Clamp01(playerRB.linearVelocity.magnitude / maxVelocity);
+            currentAlpha = Mathf.Lerp(currentAlpha, target, lerpSpeed * Time.deltaTime);
+
+            var c = noiseIndicator.color;
+            noiseIndicator.color = new Color(c.r, c.g, c.b, currentAlpha);
         }
     }
 }

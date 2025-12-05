@@ -2,103 +2,129 @@ using UnityEngine;
 
 namespace Ninja.Gameplay.Interaction
 {
-    [RequireComponent(typeof(Collider2D))]
+    /// <summary>
+    /// Пример интерактивного объекта - дверь
+    /// </summary>
     public class Door : InteractableObject
     {
         [Header("Door Settings")]
         [SerializeField] private bool isOpen = false;
-        [SerializeField] private float openAngle = 90f;
-        [SerializeField] private float openSpeed = 2f;
-        [SerializeField] private bool requiresKey = false;
-        [SerializeField] private string keyName = "";
-
-        [Header("Audio")]
-        [SerializeField] private AudioSource audioSource;
-        [SerializeField] private AudioClip openSound;
-        [SerializeField] private AudioClip closeSound;
-        [SerializeField] private AudioClip lockedSound;
-
-        private Quaternion closedRotation;
-        private Quaternion openRotation;
-        private bool isAnimating = false;
-
-        private void Start()
-        {
-            closedRotation = transform.rotation;
-            openRotation = closedRotation * Quaternion.Euler(0, 0, openAngle);
-
-            if (isOpen)
-            {
-                transform.rotation = openRotation;
-            }
-
-            if (audioSource == null)
-            {
-                audioSource = GetComponent<AudioSource>();
-            }
-        }
-
-        protected override void OnInteract(Transform interactor)
-        {
-            if (isAnimating)
-                return;
-
-            if (requiresKey && !HasKey())
-            {
-                PlaySound(lockedSound);
-                Debug.Log($"Дверь заперта! Нужен ключ: {keyName}");
-                return;
-            }
-
-            isOpen = !isOpen;
-            StartCoroutine(AnimateDoor());
-            PlaySound(isOpen ? openSound : closeSound);
-        }
-
-        private System.Collections.IEnumerator AnimateDoor()
-        {
-            isAnimating = true;
-            Quaternion targetRotation = isOpen ? openRotation : closedRotation;
-            Quaternion startRotation = transform.rotation;
-
-            float elapsed = 0f;
-            float duration = 1f / openSpeed;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                transform.rotation = Quaternion.Lerp(startRotation, targetRotation, t);
-                yield return null;
-            }
-
-            transform.rotation = targetRotation;
-            isAnimating = false;
-        }
-
-        private bool HasKey()
-        {
-            return false;
-        }
-
-        private void PlaySound(AudioClip clip)
-        {
-            if (audioSource != null && clip != null)
-            {
-                audioSource.PlayOneShot(clip);
-            }
-        }
-
-        public override string GetInteractionPrompt()
-        {
-            if (requiresKey && !HasKey())
-            {
-                return $"Заперто ({keyName})";
-            }
-
-            return isOpen ? "Закрыть дверь [E]" : "Открыть дверь [E]";
-        }
-
+        [SerializeField] private bool isLocked = false;
+        [SerializeField] private string lockedHint = "Дверь заперта";
+        [SerializeField] private string openHint = "Нажмите E чтобы закрыть";
+        [SerializeField] private string closedHint = "Нажмите E чтобы открыть";
+        
+        [Header("Door Visual")]
+        [SerializeField] private Sprite openSprite;
+        [SerializeField] private Sprite closedSprite;
+        [SerializeField] private SpriteRenderer doorRenderer;
+        
+        [Header("Door Collider")]
+        [SerializeField] private Collider2D doorBlocker;
+        
         public bool IsOpen => isOpen;
+        public bool IsLocked => isLocked;
+        
+        protected override void Awake()
+        {
+            base.Awake();
+            
+            if (doorRenderer == null)
+                doorRenderer = GetComponent<SpriteRenderer>();
+                
+            UpdateDoorState();
+        }
+        
+        public override void OnInteract(GameObject interactor)
+        {
+            if (isLocked)
+            {
+                Debug.Log($"[Door] {gameObject.name} заперта!");
+                return;
+            }
+            
+            Toggle();
+            base.OnInteract(interactor);
+        }
+        
+        public override void OnFocus(GameObject interactor)
+        {
+            // Обновляем подсказку перед фокусом
+            UpdateHint();
+            base.OnFocus(interactor);
+        }
+        
+        /// <summary>
+        /// Переключить состояние двери
+        /// </summary>
+        public void Toggle()
+        {
+            if (isLocked)
+                return;
+                
+            isOpen = !isOpen;
+            UpdateDoorState();
+        }
+        
+        /// <summary>
+        /// Открыть дверь
+        /// </summary>
+        public void Open()
+        {
+            if (isLocked || isOpen)
+                return;
+                
+            isOpen = true;
+            UpdateDoorState();
+        }
+        
+        /// <summary>
+        /// Закрыть дверь
+        /// </summary>
+        public void Close()
+        {
+            if (!isOpen)
+                return;
+                
+            isOpen = false;
+            UpdateDoorState();
+        }
+        
+        /// <summary>
+        /// Заблокировать/разблокировать дверь
+        /// </summary>
+        public void SetLocked(bool locked)
+        {
+            isLocked = locked;
+            UpdateHint();
+        }
+        
+        private void UpdateDoorState()
+        {
+            // Обновляем спрайт
+            if (doorRenderer != null)
+            {
+                if (isOpen && openSprite != null)
+                    doorRenderer.sprite = openSprite;
+                else if (!isOpen && closedSprite != null)
+                    doorRenderer.sprite = closedSprite;
+            }
+            
+            // Обновляем коллайдер блокировки
+            if (doorBlocker != null)
+                doorBlocker.enabled = !isOpen;
+                
+            UpdateHint();
+        }
+        
+        private void UpdateHint()
+        {
+            if (isLocked)
+                SetInteractionHint(lockedHint);
+            else if (isOpen)
+                SetInteractionHint(openHint);
+            else
+                SetInteractionHint(closedHint);
+        }
     }
 }
