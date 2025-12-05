@@ -1,33 +1,23 @@
-using UnityEngine;
-
 namespace Ninja.Gameplay.Enemy
 {
     public class InvestigateState : EnemyStateBase
     {
         public InvestigateState(EnemyStateContext context) : base(context) { }
 
-        public override void Enter()
-        {
-            context.Agent.speed = context.InvestigateSpeed;
-        }
+        public override void Enter() => ctx.Agent.speed = ctx.InvestigateSpeed;
 
         public override void Update()
         {
-            if (!context.HasNoisePosition)
+            if (!ctx.HasNoisePosition)
             {
-                context.OnStateChange?.Invoke(EnemyState.Return);
+                ctx.ChangeState?.Invoke(EnemyState.Return);
                 return;
             }
 
-            context.Agent.destination = context.NoisePosition;
+            ctx.Agent.destination = ctx.NoisePosition;
 
-            if (!context.Agent.pathPending && context.Agent.remainingDistance < EnemyStateContext.PATROL_DISTANCE_THRESHOLD)
-            {
-                context.OnStateChange?.Invoke(EnemyState.Scan);
-            }
+            if (ctx.ReachedDestination())
+                ctx.ChangeState?.Invoke(EnemyState.Scan);
         }
-
-        public override void Exit() { }
     }
 }
-

@@ -1,14 +1,13 @@
 using UnityEngine;
-using Keyboard;
 using UnityEngine.InputSystem;
-
+using Keyboard;
 
 namespace Ninja.Input
 {
     [RequireComponent(typeof(MouseInputController), typeof(PlayerInputController))]
     public class InputController : MonoBehaviour, KeyboardBinds.IPlayerActions
     {
-        private KeyboardBinds _inputActions;
+        private KeyboardBinds inputActions;
 
         public Vector2 Move { get; private set; }
         public Vector2 Look { get; private set; }
@@ -19,59 +18,35 @@ namespace Ninja.Input
 
         private void Awake()
         {
-            _inputActions = new KeyboardBinds();
-            _inputActions.Player.AddCallbacks(this);
-            _inputActions.Enable();
+            inputActions = new KeyboardBinds();
+            inputActions.Player.AddCallbacks(this);
+            inputActions.Enable();
         }
 
         private void OnDestroy()
         {
-            if (_inputActions != null)
-            {
-                _inputActions.Player.RemoveCallbacks(this);
-                _inputActions.Dispose();
-            }
+            inputActions?.Player.RemoveCallbacks(this);
+            inputActions?.Dispose();
         }
 
-        public void OnMove(InputAction.CallbackContext context)
-        {
-            Move = context.ReadValue<Vector2>();
-        }
+        private void LateUpdate() => InteractPressed = false;
 
-        public void OnLook(InputAction.CallbackContext context)
-        {
-            Look = context.ReadValue<Vector2>();
-        }
+        public void OnMove(InputAction.CallbackContext ctx) => Move = ctx.ReadValue<Vector2>();
+        public void OnLook(InputAction.CallbackContext ctx) => Look = ctx.ReadValue<Vector2>();
+        public void OnCrouch(InputAction.CallbackContext ctx) => Crouch = ctx.ReadValue<float>() > 0.5f;
+        public void OnSprint(InputAction.CallbackContext ctx) => Sprint = ctx.ReadValue<float>() > 0.5f;
 
-        public void OnInteract(InputAction.CallbackContext context)
+        public void OnInteract(InputAction.CallbackContext ctx)
         {
-            // Обрабатываем момент нажатия (performed) для взаимодействия
-            if (context.performed)
+            if (ctx.performed)
             {
                 Interact = true;
                 InteractPressed = true;
             }
-            else if (context.canceled)
+            else if (ctx.canceled)
             {
                 Interact = false;
             }
         }
-
-        private void LateUpdate()
-        {
-            // Сбрасываем флаг нажатия после обработки
-            InteractPressed = false;
-        }
-
-        public void OnCrouch(InputAction.CallbackContext context)
-        {
-            Crouch = context.ReadValue<float>() > 0.5f;
-        }
-
-        public void OnSprint(InputAction.CallbackContext context)
-        {
-            Sprint = context.ReadValue<float>() > 0.5f;
-        }
     }
 }
-

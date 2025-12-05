@@ -5,50 +5,38 @@ namespace Ninja.Gameplay.Enemy
 {
     public class ChaseState : EnemyStateBase
     {
-        private Coroutine forgetTargetCoroutine;
+        private Coroutine loseTargetCoroutine;
 
         public ChaseState(EnemyStateContext context) : base(context) { }
 
         public override void Enter()
         {
-            context.Agent.speed = context.ChaseSpeed;
-            context.LastSeenTargetTime = Time.time;
-
-            if (forgetTargetCoroutine != null && context.CoroutineRunner != null)
-            {
-                context.CoroutineRunner.StopCoroutine(forgetTargetCoroutine);
-            }
-
-            forgetTargetCoroutine = context.CoroutineRunner.StartCoroutine(ForgetTargetAfterDelay());
+            ctx.Agent.speed = ctx.ChaseSpeed;
+            ctx.LastSeenTime = Time.time;
+            loseTargetCoroutine = ctx.CoroutineRunner.StartCoroutine(CheckLoseTarget());
         }
 
         public override void Update()
         {
-            if (context.Player == null)
-                return;
+            if (ctx.Player == null) return;
 
-            context.Agent.destination = context.Player.position;
-            context.LastSeenTargetTime = Time.time;
+            ctx.Agent.destination = ctx.Player.position;
+            ctx.LastSeenTime = Time.time;
         }
 
         public override void Exit()
         {
-            if (forgetTargetCoroutine != null && context.CoroutineRunner != null)
-            {
-                context.CoroutineRunner.StopCoroutine(forgetTargetCoroutine);
-            }
+            if (loseTargetCoroutine != null)
+                ctx.CoroutineRunner.StopCoroutine(loseTargetCoroutine);
         }
 
-        private IEnumerator ForgetTargetAfterDelay()
+        private IEnumerator CheckLoseTarget()
         {
-            while (Time.time - context.LastSeenTargetTime < context.LoseTargetTime)
-            {
+            while (Time.time - ctx.LastSeenTime < ctx.LoseTargetTime)
                 yield return null;
-            }
 
-            context.SearchStartTime = Time.time;
-            context.OnStateChange?.Invoke(EnemyState.Search);
+            ctx.SearchStartTime = Time.time;
+            ctx.ChangeState?.Invoke(EnemyState.Search);
         }
     }
 }
-

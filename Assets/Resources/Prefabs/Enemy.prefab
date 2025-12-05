@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6450090149170557367}
   - component: {fileID: 3332866906136827520}
   - component: {fileID: 3793727938686229343}
+  - component: {fileID: 9207940378389654406}
   - component: {fileID: 7238248351400387166}
   - component: {fileID: 1251932716444952507}
   m_Layer: 0
@@ -130,7 +131,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed2d821098d87314faf807f51cf2b329, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Enemy.EnemyController
-  state: 0
   agent: {fileID: 6450090149170557367}
   rotationSpeed: 5
   player: {fileID: 0}
@@ -140,11 +140,12 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   patrolSpeed: 2
-  waitTimeAtPatrolPoint: 0.75
+  waitTime: 0.75
   chaseSpeed: 4
   loseTargetTime: 3
   fieldOfView: {fileID: 7594538044582502341}
-  timeToForgetTarget: 5
+  detectionSystem: {fileID: 0}
+  forgetTime: 5
   investigateSpeed: 3
   scanDuration: 3
   returnSpeed: 2
@@ -160,6 +161,50 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e39f6090724e4a4a8aadeb042afa2bc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NavMeshPlus::NavMeshPlus.Extensions.AgentOverride2d
+--- !u!114 &9207940378389654406
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2507261011424033048}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7069c3ca871bc414783820ab490ae971, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Enemy.DetectionSystem
+  maxDetectionTime: 2
+  detectionDecayRate: 1.5
+  distanceCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 2
+      inSlope: 0
+      outSlope: -1.5
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0.5
+      inSlope: -1.5
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  alertThreshold: 0.5
+  lightDetectionMultiplier: 1.5
+  shadowDetectionMultiplier: 0.3
+  fieldOfView: {fileID: 7594538044582502341}
+  target: {fileID: 0}
+  showDebug: 0
 --- !u!58 &7238248351400387166
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -326,16 +371,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Enemy.FieldOfView
   viewRadius: 6
-  viewAngleHorizontal: 90
-  viewAngleVertical: 180
-  rayCountHorizontal: 60
-  rayCountVertical: 30
-  targetMask:
-    serializedVersion: 2
-    m_Bits: 8
+  viewAngle: 90
+  rayCount: 60
   obstacleMask:
     serializedVersion: 2
     m_Bits: 64
-  showDebugInfo: 1
   fovMaterial: {fileID: 0}
-  meshRenderer: {fileID: 0}
+  normalColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.3}
+  alertColor: {r: 1, g: 0, b: 0, a: 0.3}

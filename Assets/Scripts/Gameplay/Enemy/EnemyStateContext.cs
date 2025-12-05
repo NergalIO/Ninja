@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -5,54 +6,59 @@ namespace Ninja.Gameplay.Enemy
 {
     public class EnemyStateContext
     {
-        public const float PATROL_DISTANCE_THRESHOLD = 0.25f;
+        public const float DISTANCE_THRESHOLD = 0.25f;
 
-        // Navigation
-        public NavMeshAgent Agent { get; set; }
-        public float RotationSpeed { get; set; }
-        public Transform Transform { get; set; }
-
-        // Player
-        public Transform Player { get; set; }
+        // Core
+        public NavMeshAgent Agent;
+        public Transform Transform;
+        public Transform Player;
+        public MonoBehaviour CoroutineRunner;
+        
+        // Callbacks
+        public Action<EnemyState> ChangeState;
+        public Action OnPlayerDetected;
 
         // Patrol
-        public Transform[] PatrolPoints { get; set; }
-        public float PatrolSpeed { get; set; }
-        public int CurrentPatrolPointIndex { get; set; }
-        public float WaitTimeAtPatrolPoint { get; set; }
+        public Transform[] PatrolPoints;
+        public float PatrolSpeed;
+        public float WaitTime;
+        public int CurrentPatrolIndex;
+        public Vector3 LastPatrolPosition;
+        public bool HasLastPatrolPosition;
 
         // Chase
-        public float ChaseSpeed { get; set; }
-        public float LoseTargetTime { get; set; }
-        public float LastSeenTargetTime { get; set; }
-
-        // View
-        public FieldOfView FieldOfView { get; set; }
+        public float ChaseSpeed;
+        public float LoseTargetTime;
+        public float LastSeenTime;
 
         // Search
-        public float TimeToForgetTarget { get; set; }
-        public float SearchStartTime { get; set; }
+        public float ForgetTime;
+        public float SearchStartTime;
 
         // Investigate
-        public float InvestigateSpeed { get; set; }
-        public Vector3 NoisePosition { get; set; }
-        public bool HasNoisePosition { get; set; }
+        public float InvestigateSpeed;
+        public Vector3 NoisePosition;
+        public bool HasNoisePosition;
 
-        // Scan
-        public float ScanDuration { get; set; }
-        public float ScanStartTime { get; set; }
+        // Scan / Detection
+        public FieldOfView FieldOfView;
+        public DetectionSystem DetectionSystem;
+        public float ScanDuration;
+        public float ScanStartTime;
 
         // Return
-        public float ReturnSpeed { get; set; }
-        public Vector3 LastPatrolPosition { get; set; }
-        public bool HasLastPatrolPosition { get; set; }
+        public float ReturnSpeed;
 
-        // State management
-        public System.Action<EnemyState> OnStateChange { get; set; }
-        public System.Func<EnemyState> GetCurrentState { get; set; }
-        public System.Action OnPlayerDetected { get; set; }
-        public System.Action MoveToNextPatrolPoint { get; set; }
-        public MonoBehaviour CoroutineRunner { get; set; }
+        public void NextPatrolPoint()
+        {
+            if (PatrolPoints == null || PatrolPoints.Length == 0) return;
+            CurrentPatrolIndex = (CurrentPatrolIndex + 1) % PatrolPoints.Length;
+            Agent.destination = PatrolPoints[CurrentPatrolIndex].position;
+        }
+
+        public bool ReachedDestination()
+        {
+            return !Agent.pathPending && Agent.remainingDistance < DISTANCE_THRESHOLD;
+        }
     }
 }
-

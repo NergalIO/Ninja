@@ -1,58 +1,126 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace Ninja.Gameplay.Interaction
 {
-    public abstract class InteractableObject : MonoBehaviour, IInteractable
+    /// <summary>
+    /// Базовый класс для интерактивных объектов
+    /// </summary>
+    [RequireComponent(typeof(Collider2D))]
+    public class InteractableObject : MonoBehaviour, IInteractable
     {
         [Header("Interaction Settings")]
-        [SerializeField] protected float interactionDistance = 2f;
-        [SerializeField] protected string interactionPrompt = "Нажмите E для взаимодействия";
-        [SerializeField] protected bool canInteractMultipleTimes = true;
-        [SerializeField] protected bool isInteractable = true;
-
-        protected bool hasBeenInteracted = false;
-
-        public virtual void Interact(Transform interactor)
+        [SerializeField] private bool canInteract = true;
+        [SerializeField] private string interactionHint = "Нажмите E";
+        [SerializeField] private bool singleUse = false;
+        
+        [Header("Visual Feedback")]
+        [SerializeField] private SpriteRenderer spriteRenderer;
+        [SerializeField] private Color highlightColor = new Color(1f, 1f, 0.5f, 1f);
+        [SerializeField] private bool useHighlight = true;
+        
+        [Header("Events")]
+        [SerializeField] private UnityEvent onInteract;
+        [SerializeField] private UnityEvent onFocus;
+        [SerializeField] private UnityEvent onUnfocus;
+        
+        private Color originalColor;
+        private bool hasBeenUsed = false;
+        private bool isFocused = false;
+        
+        public bool CanInteract => canInteract && (!singleUse || !hasBeenUsed);
+        public string InteractionHint => interactionHint;
+        public Transform Transform => transform;
+        public bool IsFocused => isFocused;
+        
+        protected virtual void Awake()
         {
-            if (!CanInteract(interactor))
-                return;
-
-            OnInteract(interactor);
-
-            if (!canInteractMultipleTimes)
+            if (spriteRenderer == null)
+                spriteRenderer = GetComponent<SpriteRenderer>();
+            
+            if (spriteRenderer != null)
+                originalColor = spriteRenderer.color;
+                
+            // Убедимся что есть триггер коллайдер для обнаружения
+            var collider = GetComponent<Collider2D>();
+            if (collider != null && !collider.isTrigger)
             {
-                hasBeenInteracted = true;
+                Debug.LogWarning($"[InteractableObject] Collider на {gameObject.name} не является триггером. " +
+                    "Рекомендуется использовать триггер для зоны взаимодействия.", this);
             }
         }
-
-        public virtual bool CanInteract(Transform interactor)
+        
+        public virtual void OnInteract(GameObject interactor)
         {
-            if (!isInteractable)
-                return false;
-
-            if (!canInteractMultipleTimes && hasBeenInteracted)
-                return false;
-
-            float distance = Vector2.Distance(transform.position, interactor.position);
-            return distance <= interactionDistance;
+            if (!CanInteract)
+                return;
+                
+            if (singleUse)
+                hasBeenUsed = true;
+                
+            onInteract?.Invoke();
+            
+            Debug.Log($"[InteractableObject] {interactor.name} взаимодействует с {gameObject.name}");
         }
-
-        public virtual string GetInteractionPrompt()
+        
+        public virtual void OnFocus(GameObject interactor)
         {
-            return interactionPrompt;
+            if (!CanInteract)
+                return;
+                
+            isFocused = true;
+            
+            if (useHighlight && spriteRenderer != null)
+                spriteRenderer.color = highlightColor;
+                
+            onFocus?.Invoke();
         }
-
-        public virtual float GetInteractionDistance()
+        
+        public virtual void OnUnfocus(GameObject interactor)
         {
-            return interactionDistance;
+            isFocused = false;
+            
+            if (useHighlight && spriteRenderer != null)
+                spriteRenderer.color = originalColor;
+                
+            onUnfocus?.Invoke();
         }
-
-        protected abstract void OnInteract(Transform interactor);
-
-        protected virtual void OnDrawGizmosSelected()
+        
+        /// <summary>
+        /// Сбросить состояние объекта (для переиспользования)
+        /// </summary>
+        public virtual void ResetInteractable()
         {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireSphere(transform.position, interactionDistance);
+            hasBeenUsed = false;
+            canInteract = true;
         }
+        
+        /// <summary>
+        /// Установить возможность взаимодействия
+        /// </summary>
+        public void SetCanInteract(bool value)
+        {
+            canInteract = value;
+            
+            // Если объект сейчас в фокусе но стал недоступен - снимаем подсветку
+            if (!canInteract && isFocused && useHighlight && spriteRenderer != null)
+                spriteRenderer.color = originalColor;
+        }
+        
+        /// <summary>
+        /// Установить подсказку взаимодействия
+        /// </summary>
+        public void SetInteractionHint(string hint)
+        {
+            interactionHint = hint;
+        }
+        
+#if UNITY_EDITOR
+        protected virtual void OnValidate()
+        {
+            if (spriteRenderer == null)
+                spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+#endif
     }
 }

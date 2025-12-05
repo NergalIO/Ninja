@@ -1,23 +1,13 @@
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace Ninja.Core
 {
     public static class RandomSprite
     {
-        public static Sprite GetRandomSpriteFromResources(string path)
+        public static Sprite GetRandom(string path)
         {
-            List<Sprite> images = Resources.LoadAll<Sprite>(path).ToList();
-            if (images.Count == 0)
-            {
-                return default;
-            }
-            return images[Random.Range(0, images.Count - 1)];
+            var sprites = Resources.LoadAll<Sprite>(path);
+            return sprites.Length > 0 ? sprites[Random.Range(0, sprites.Length)] : null;
         }
-
-        public static Sprite RandomSpriteFromResources
-                => GetRandomSpriteFromResources("Images/Background");
     }
 }
-

@@ -8,25 +8,29 @@ namespace Ninja.Gameplay.Enemy
 
         public override void Enter()
         {
-            context.Agent.speed = 0f;
-            context.ScanStartTime = Time.time;
+            ctx.Agent.speed = 0f;
+            ctx.ScanStartTime = Time.time;
         }
 
         public override void Update()
         {
-            if (context.FieldOfView != null && context.FieldOfView.CanSeeTarget)
+            // Используем DetectionSystem если есть, иначе прямую проверку
+            if (ctx.DetectionSystem != null)
             {
-                context.OnPlayerDetected?.Invoke();
+                if (ctx.DetectionSystem.IsFullyDetected)
+                {
+                    ctx.OnPlayerDetected?.Invoke();
+                    return;
+                }
+            }
+            else if (ctx.FieldOfView != null && ctx.FieldOfView.CanSeeTarget)
+            {
+                ctx.OnPlayerDetected?.Invoke();
                 return;
             }
 
-            if (Time.time - context.ScanStartTime > context.ScanDuration)
-            {
-                context.OnStateChange?.Invoke(EnemyState.Return);
-            }
+            if (Time.time - ctx.ScanStartTime > ctx.ScanDuration)
+                ctx.ChangeState?.Invoke(EnemyState.Return);
         }
-
-        public override void Exit() { }
     }
 }
-

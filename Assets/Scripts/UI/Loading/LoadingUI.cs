@@ -1,70 +1,56 @@
-using UnityEngine;
-
-using Ninja.Systems.Loader;
-using Ninja.Core;
 using System.Collections;
+using UnityEngine;
+using Ninja.Core;
 using Ninja.Systems;
-
+using Ninja.Systems.Loader;
 
 namespace Ninja.UI.Loading
 {
     public class LoadingUI : PersistentSingleton<LoadingUI>
     {
-        [Header("References")]
         [SerializeField] private GameObject loadingPanelPrefab;
-
-        private LoadingPanel loadingPanelInstance;
+        private LoadingPanel panel;
 
         protected override void OnSingletonInitialized()
         {
             base.OnSingletonInitialized();
-            if (AsyncSceneLoader.Instance != null)
-            {
-                AsyncSceneLoader.Instance.OnSceneLoadStarted += HandleSceneLoadStarted;
-                AsyncSceneLoader.Instance.OnSceneLoadCompleted += HandleSceneLoadCompleted;
-            }
-            else
-            {
-                StartCoroutine(WaitForLoader());
-            }
+            StartCoroutine(SubscribeToLoader());
         }
 
-        private IEnumerator WaitForLoader()
+        private IEnumerator SubscribeToLoader()
         {
             while (AsyncSceneLoader.Instance == null)
                 yield return null;
 
-            AsyncSceneLoader.Instance.OnSceneLoadStarted += HandleSceneLoadStarted;
-            AsyncSceneLoader.Instance.OnSceneLoadCompleted += HandleSceneLoadCompleted;
+            AsyncSceneLoader.Instance.OnSceneLoadStarted += OnLoadStarted;
+            AsyncSceneLoader.Instance.OnSceneLoadCompleted += OnLoadCompleted;
         }
 
         protected override void OnDestroy()
         {
             if (AsyncSceneLoader.Instance != null)
             {
-                AsyncSceneLoader.Instance.OnSceneLoadStarted -= HandleSceneLoadStarted;
-                AsyncSceneLoader.Instance.OnSceneLoadCompleted -= HandleSceneLoadCompleted;
+                AsyncSceneLoader.Instance.OnSceneLoadStarted -= OnLoadStarted;
+                AsyncSceneLoader.Instance.OnSceneLoadCompleted -= OnLoadCompleted;
             }
             base.OnDestroy();
         }
 
-        public void OnSceneLoadProgress(float progress)
+        public void OnSceneLoadProgress(float progress) => panel?.OnProgress(progress);
+
+        private void OnLoadStarted()
         {
-            loadingPanelInstance.OnProgress(progress);
+            panel = Instantiate(loadingPanelPrefab, transform).GetComponent<LoadingPanel>();
+            panel.Open();
         }
 
-        private void HandleSceneLoadStarted()
+        private void OnLoadCompleted()
         {
-            loadingPanelInstance = Instantiate(loadingPanelPrefab, transform).GetComponent<LoadingPanel>();
-            loadingPanelInstance.Open();
-        }
-
-        private void HandleSceneLoadCompleted()
-        {
-            if (GameManager.Instance.IsPaused)
+            if (GameManager.Instance && GameManager.Instance.IsPaused)
                 GameManager.Instance.TogglePause();
-            loadingPanelInstance.Close();
-            Destroy(loadingPanelInstance.gameObject);
+
+            panel?.Close();
+            if (panel != null) Destroy(panel.gameObject);
         }
     }
 }
