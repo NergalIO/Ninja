@@ -152,7 +152,8 @@ namespace Ninja.Gameplay.Player
             if (inputController == null)
                 return;
             
-            bool interactInput = inputController.IsInteracting && !wasInteracting;
+            bool isInteracting = inputController.IsInteracting;
+            bool interactInput = isInteracting && !wasInteracting;
             wasInteracting = isInteracting;
             
             if (showDebugLogs && interactInput)

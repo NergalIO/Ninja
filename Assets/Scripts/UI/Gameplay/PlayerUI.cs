@@ -17,10 +17,9 @@ namespace Ninja.UI.Gameplay
         {
             if (GameManager.Instance && GameManager.Instance.IsPaused)
                 Close();
+            UpdateNoiseIndicator();
             base.Update();
         }
-
-        private void FixedUpdate() => UpdateNoiseIndicator();
 
         private void UpdateNoiseIndicator()
         {

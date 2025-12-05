@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using Ninja.Core.Events;
+using Ninja.Gameplay.Environment;
+using Ninja.Gameplay.Player;
 
 namespace Ninja.Gameplay.Enemy
 {
@@ -10,9 +12,6 @@ namespace Ninja.Gameplay.Enemy
     {
         private const float CATCH_DISTANCE = 1.2f;
         private const float MOVE_THRESHOLD = 0.1f;
-
-        [Header("State")]
-        [SerializeField] private EnemyState state;
 
         [Header("Navigation")]
         [SerializeField] private NavMeshAgent agent;
@@ -32,6 +31,7 @@ namespace Ninja.Gameplay.Enemy
 
         [Header("Vision")]
         [SerializeField] private FieldOfView fieldOfView;
+        [SerializeField] private DetectionSystem detectionSystem;
 
         [Header("Search")]
         [SerializeField] private float forgetTime = 5f;
@@ -46,18 +46,72 @@ namespace Ninja.Gameplay.Enemy
         [SerializeField] private float returnSpeed = 2f;
 
         private EnemyStateContext context;
+        private Dictionary<EnemyState, EnemyStateBase> states;
         private EnemyStateBase currentState;
         private EnemyState currentStateType = EnemyState.Patrol;
-        private Dictionary<EnemyState, EnemyStateBase> states;
         private bool playerCaught;
-        private bool initialized;
+        private bool isPaused;
+
+        public float DetectionLevel => detectionSystem != null ? detectionSystem.DetectionLevel : 0f;
 
         private void Awake()
         {
+            SetupAgent();
+            SetupDetection();
             InitContext();
             InitStates();
-            SetupAgent();
-            SetupFieldOfView();
+        }
+
+        private void OnEnable()
+        {
+            Events.Subscribe(GameEvents.GamePaused, OnGamePaused);
+            Events.Subscribe(GameEvents.GameResumed, OnGameResumed);
+        }
+
+        private void OnDisable()
+        {
+            Events.Unsubscribe(GameEvents.GamePaused, OnGamePaused);
+            Events.Unsubscribe(GameEvents.GameResumed, OnGameResumed);
+        }
+
+        private void OnGamePaused(EventArgs e)
+        {
+            isPaused = true;
+            if (agent != null && agent.isOnNavMesh)
+                agent.isStopped = true;
+        }
+
+        private void OnGameResumed(EventArgs e)
+        {
+            isPaused = false;
+            if (agent != null && agent.isOnNavMesh)
+                agent.isStopped = false;
+        }
+        
+        private void SetupDetection()
+        {
+            if (fieldOfView != null && player != null)
+                fieldOfView.SetTarget(player);
+            
+            // Создаём DetectionSystem если не назначен
+            if (detectionSystem == null)
+                detectionSystem = GetComponent<DetectionSystem>();
+            
+            if (detectionSystem != null)
+            {
+                detectionSystem.SetTarget(player);
+                detectionSystem.OnAlertTriggered += HandlePlayerAlert;
+                detectionSystem.OnTargetDetected += HandlePlayerDetected;
+            }
+        }
+
+        private void HandlePlayerAlert()
+        {
+            // Переходим в состояние Alert только если не в погоне
+            if (currentStateType != EnemyState.Chase && currentStateType != EnemyState.Alert)
+            {
+                ChangeState(EnemyState.Alert);
+            }
         }
 
         private void Start()
@@ -75,15 +129,18 @@ namespace Ninja.Gameplay.Enemy
             ChangeState(EnemyState.Patrol);
         }
 
-        private void FixedUpdate()
+        private void Update()
         {
-            CheckVision();
+            if (isPaused) return;
+            
+            if (detectionSystem != null && player != null)
+                detectionSystem.SetTargetInShadow(ShadowZone.IsInShadow(player));
+
             UpdateRotation();
             CheckCatch();
             currentState?.Update();
         }
 
-        #region Initialization
         private void SetupAgent()
         {
             if (agent == null) return;
@@ -91,35 +148,27 @@ namespace Ninja.Gameplay.Enemy
             agent.enabled = true;
         }
 
-        private void SetupFieldOfView()
-        {
-            if (fieldOfView != null && player != null)
-                fieldOfView.SetTarget(player);
-        }
-
         private void InitContext()
         {
             context = new EnemyStateContext
             {
                 Agent = agent,
-                RotationSpeed = rotationSpeed,
                 Transform = transform,
                 Player = player,
                 PatrolPoints = patrolPoints,
                 PatrolSpeed = patrolSpeed,
-                WaitTimeAtPatrolPoint = waitTime,
+                WaitTime = waitTime,
                 ChaseSpeed = chaseSpeed,
                 LoseTargetTime = loseTargetTime,
                 FieldOfView = fieldOfView,
-                TimeToForgetTarget = forgetTime,
+                DetectionSystem = detectionSystem,
+                ForgetTime = forgetTime,
                 InvestigateSpeed = investigateSpeed,
                 ScanDuration = scanDuration,
                 ReturnSpeed = returnSpeed,
                 CoroutineRunner = this,
-                OnStateChange = ChangeState,
-                GetCurrentState = () => currentStateType,
-                OnPlayerDetected = HandlePlayerDetected,
-                MoveToNextPatrolPoint = NextPatrolPoint
+                ChangeState = ChangeState,
+                OnPlayerDetected = HandlePlayerDetected
             };
         }
 
@@ -128,6 +177,7 @@ namespace Ninja.Gameplay.Enemy
             states = new Dictionary<EnemyState, EnemyStateBase>
             {
                 { EnemyState.Patrol, new PatrolState(context) },
+                { EnemyState.Alert, new AlertState(context) },
                 { EnemyState.Chase, new ChaseState(context) },
                 { EnemyState.Search, new SearchState(context) },
                 { EnemyState.Investigate, new InvestigateState(context) },
@@ -142,14 +192,6 @@ namespace Ninja.Gameplay.Enemy
             if (agent.isOnNavMesh)
                 ChangeState(EnemyState.Patrol);
         }
-        #endregion
-
-        #region Core Logic
-        private void CheckVision()
-        {
-            if (fieldOfView != null && fieldOfView.CanSeeTarget)
-                HandlePlayerDetected();
-        }
 
         private void UpdateRotation()
         {
@@ -159,10 +201,7 @@ namespace Ninja.Gameplay.Enemy
             if (dir.magnitude <= MOVE_THRESHOLD) return;
 
             float target = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            float current = transform.eulerAngles.z;
-            float delta = Mathf.DeltaAngle(current, target);
-            float newAngle = current + delta * rotationSpeed * Time.fixedDeltaTime;
-
+            float newAngle = Mathf.MoveTowardsAngle(transform.eulerAngles.z, target, rotationSpeed * Time.deltaTime * 60f);
             transform.rotation = Quaternion.Euler(0, 0, newAngle);
         }
 
@@ -177,34 +216,39 @@ namespace Ninja.Gameplay.Enemy
             }
         }
 
-        private void NextPatrolPoint()
-        {
-            if (patrolPoints == null || patrolPoints.Length == 0) return;
-            context.CurrentPatrolPointIndex = (context.CurrentPatrolPointIndex + 1) % patrolPoints.Length;
-            agent.destination = patrolPoints[context.CurrentPatrolPointIndex].position;
-        }
-        #endregion
+        private void OnTriggerEnter2D(Collider2D col) => HandleNoiseTrigger(col);
+        
+        private void OnTriggerStay2D(Collider2D col) => HandleNoiseTrigger(col);
 
-        #region Events
-        private void OnTriggerEnter2D(Collider2D col)
+        private void HandleNoiseTrigger(Collider2D col)
         {
-            if (col.CompareTag("NoiseArea"))
-                HandleNoise(col.transform.position);
-        }
-
-        private void HandleNoise(Vector3 pos)
-        {
-            Events.Trigger(GameEvents.PlayerHeard, new NoiseEventArgs(pos));
-
-            if (currentStateType == EnemyState.Chase)
-            {
-                HandlePlayerDetected();
+            if (!col.CompareTag("NoiseArea")) return;
+            
+            // Уже в погоне или Alert - не реагируем повторно
+            if (currentStateType == EnemyState.Chase || currentStateType == EnemyState.Alert)
                 return;
-            }
+
+            // Получаем NoiseController и проверяем слышимость
+            var noiseController = col.GetComponentInParent<NoiseController>();
+            if (noiseController != null && !noiseController.CanBeHeardAt(transform.position))
+                return;
+            
+            var pos = col.transform.position;
+            Events.Trigger(GameEvents.PlayerHeard, new NoiseEventArgs(pos));
 
             context.NoisePosition = pos;
             context.HasNoisePosition = true;
-            ChangeState(EnemyState.Investigate);
+            
+            // Шум повышает уровень обнаружения до 50% и переводит в Alert
+            if (detectionSystem != null)
+            {
+                detectionSystem.OnNoiseHeard(pos);
+                ChangeState(EnemyState.Alert);
+            }
+            else
+            {
+                ChangeState(EnemyState.Investigate);
+            }
         }
 
         private void HandlePlayerDetected()
@@ -216,14 +260,11 @@ namespace Ninja.Gameplay.Enemy
             Events.Trigger(GameEvents.ChaseStarted, new EnemyEventArgs(gameObject));
             ChangeState(EnemyState.Chase);
         }
-        #endregion
 
-        #region State Management
         private void ChangeState(EnemyState newState)
         {
-            if (currentStateType == newState && initialized) return;
+            if (currentStateType == newState && currentState != null) return;
 
-            // Событие окончания погони
             if (currentStateType == EnemyState.Chase && newState != EnemyState.Chase)
                 Events.Trigger(GameEvents.ChaseEnded, new EnemyEventArgs(gameObject));
 
@@ -232,12 +273,9 @@ namespace Ninja.Gameplay.Enemy
             if (states.TryGetValue(newState, out var nextState))
             {
                 currentStateType = newState;
-                state = newState;
                 currentState = nextState;
-                initialized = true;
                 currentState.Enter();
             }
         }
-        #endregion
     }
 }

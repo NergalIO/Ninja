@@ -5,162 +5,56 @@ namespace Ninja.Gameplay.Enemy
 {
     public class PatrolState : EnemyStateBase
     {
-        private bool isWaitingAtPoint = false;
         private Coroutine waitCoroutine;
-        private Coroutine initializationCoroutine;
-        private bool hasSetInitialDestination = false;
+        private bool isWaiting;
 
         public PatrolState(EnemyStateContext context) : base(context) { }
 
         public override void Enter()
         {
-            if (context.Agent == null || context.PatrolPoints == null || context.PatrolPoints.Length == 0)
+            if (ctx.Agent == null || ctx.PatrolPoints == null || ctx.PatrolPoints.Length == 0)
                 return;
 
-            if (!context.Agent.enabled)
-            {
-                context.Agent.enabled = true;
-            }
-
-            context.Agent.speed = context.PatrolSpeed;
-            hasSetInitialDestination = false;
-
-            if (context.Agent.isOnNavMesh)
-            {
-                MoveToCurrentPatrolPoint();
-                hasSetInitialDestination = true;
-            }
-            else
-            {
-                if (initializationCoroutine != null && context.CoroutineRunner != null)
-                {
-                    context.CoroutineRunner.StopCoroutine(initializationCoroutine);
-                }
-
-                initializationCoroutine = context.CoroutineRunner.StartCoroutine(InitializePatrol());
-            }
+            ctx.Agent.speed = ctx.PatrolSpeed;
+            MoveToCurrentPoint();
         }
 
         public override void Update()
         {
-            if (context.PatrolPoints == null || context.PatrolPoints.Length == 0)
+            if (ctx.PatrolPoints == null || ctx.PatrolPoints.Length == 0 || isWaiting)
                 return;
 
-            if (context.Agent == null || !context.Agent.enabled || !hasSetInitialDestination)
-                return;
-
-            if (isWaitingAtPoint)
-                return;
-
-            if (!context.Agent.pathPending && context.Agent.hasPath)
+            if (ctx.ReachedDestination())
             {
-                if (context.Agent.remainingDistance < EnemyStateContext.PATROL_DISTANCE_THRESHOLD)
-                {
-                    StartWaitingAtPoint();
-                }
-            }
-            else if (!context.Agent.pathPending && !context.Agent.hasPath && hasSetInitialDestination)
-            {
-                MoveToCurrentPatrolPoint();
+                isWaiting = true;
+                ctx.Agent.speed = 0f;
+                waitCoroutine = ctx.CoroutineRunner.StartCoroutine(WaitAndMove());
             }
 
-            if (!context.HasLastPatrolPosition)
-            {
-                context.LastPatrolPosition = context.Transform.position;
-                context.HasLastPatrolPosition = true;
-            }
+            ctx.LastPatrolPosition = ctx.Transform.position;
+            ctx.HasLastPatrolPosition = true;
         }
 
         public override void Exit()
         {
-            if (waitCoroutine != null && context.CoroutineRunner != null)
-            {
-                context.CoroutineRunner.StopCoroutine(waitCoroutine);
-                waitCoroutine = null;
-            }
-
-            if (initializationCoroutine != null && context.CoroutineRunner != null)
-            {
-                context.CoroutineRunner.StopCoroutine(initializationCoroutine);
-                initializationCoroutine = null;
-            }
-
-            isWaitingAtPoint = false;
-            hasSetInitialDestination = false;
+            if (waitCoroutine != null)
+                ctx.CoroutineRunner.StopCoroutine(waitCoroutine);
+            isWaiting = false;
         }
 
-        private IEnumerator InitializePatrol()
+        private IEnumerator WaitAndMove()
         {
-            yield return null;
-
-            if (context.Agent == null || !context.Agent.enabled)
-                yield break;
-
-            if (!context.Agent.isOnNavMesh)
-            {
-                context.Agent.Warp(context.Transform.position);
-                yield return null;
-
-                if (!context.Agent.isOnNavMesh)
-                    yield break;
-            }
-
-            MoveToCurrentPatrolPoint();
-            hasSetInitialDestination = true;
-            initializationCoroutine = null;
+            yield return new WaitForSeconds(ctx.WaitTime);
+            isWaiting = false;
+            ctx.Agent.speed = ctx.PatrolSpeed;
+            ctx.NextPatrolPoint();
         }
 
-        private void StartWaitingAtPoint()
+        private void MoveToCurrentPoint()
         {
-            isWaitingAtPoint = true;
-            context.Agent.speed = 0f;
-            
-            if (waitCoroutine != null && context.CoroutineRunner != null)
-            {
-                context.CoroutineRunner.StopCoroutine(waitCoroutine);
-            }
-
-            waitCoroutine = context.CoroutineRunner.StartCoroutine(WaitAtPoint());
-        }
-
-        private IEnumerator WaitAtPoint()
-        {
-            yield return new WaitForSeconds(context.WaitTimeAtPatrolPoint);
-            
-            isWaitingAtPoint = false;
-            context.Agent.speed = context.PatrolSpeed;
-            MoveToNextPatrolPoint();
-            waitCoroutine = null;
-        }
-
-        private void MoveToCurrentPatrolPoint()
-        {
-            if (context.PatrolPoints == null || context.PatrolPoints.Length == 0 || context.Agent == null)
-                return;
-
-            if (context.CurrentPatrolPointIndex < 0 || context.CurrentPatrolPointIndex >= context.PatrolPoints.Length)
-                return;
-
-            Transform targetPoint = context.PatrolPoints[context.CurrentPatrolPointIndex];
-            if (targetPoint == null)
-                return;
-
-            context.Agent.destination = targetPoint.position;
-        }
-
-        private void MoveToNextPatrolPoint()
-        {
-            if (context.PatrolPoints == null || context.PatrolPoints.Length == 0 || context.Agent == null)
-                return;
-
-            context.CurrentPatrolPointIndex = (context.CurrentPatrolPointIndex + 1) % context.PatrolPoints.Length;
-            
-            Transform targetPoint = context.PatrolPoints[context.CurrentPatrolPointIndex];
-            if (targetPoint == null)
-                return;
-
-            context.Agent.destination = targetPoint.position;
+            if (ctx.CurrentPatrolIndex >= ctx.PatrolPoints.Length)
+                ctx.CurrentPatrolIndex = 0;
+            ctx.Agent.destination = ctx.PatrolPoints[ctx.CurrentPatrolIndex].position;
         }
     }
 }
-

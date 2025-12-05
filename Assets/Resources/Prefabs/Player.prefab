@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6680245542512537389}
   - component: {fileID: 3584422684912602350}
   - component: {fileID: 2351314371435096328}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: InputSystem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -47,7 +47,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.InputSystem.MouseInputController
   inputController: {fileID: 2351314371435096328}
-  uiInputController: {fileID: 0}
 --- !u!114 &3584422684912602350
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -82,11 +81,12 @@ GameObject:
   m_Component:
   - component: {fileID: 647076845276568180}
   - component: {fileID: 7282979212160062182}
+  - component: {fileID: 1009778335952468947}
   - component: {fileID: 6825480219068780235}
   - component: {fileID: 1482464602458766081}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Player
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -123,9 +123,35 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Player.MovementController
   controller: {fileID: 3584422684912602350}
   rigidbody2d: {fileID: 6825480219068780235}
-  defaultSpeed: 200
-  crouchSpeed: 50
-  sprintSpeed: 350
+  mainCamera: {fileID: 0}
+  mouseInputController: {fileID: 6680245542512537389}
+  defaultSpeed: 3
+  crouchSpeed: 1
+  sprintSpeed: 5
+  rotationSpeed: 360
+  showDebugInfo: 0
+--- !u!114 &1009778335952468947
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3406261285952449502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a458f9cc8194f44c920e15d29b51d77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Player.PlayerInteractionController
+  inputController: {fileID: 3584422684912602350}
+  detectionRadius: 0.5
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 512
+  viewAngle: 120
+  requireLineOfSight: 1
+  showDebugGizmos: 0
+  showDebugLogs: 0
+  gizmoColor: {r: 0, g: 1, b: 0, a: 0.3}
 --- !u!50 &6825480219068780235
 Rigidbody2D:
   serializedVersion: 5
@@ -136,9 +162,9 @@ Rigidbody2D:
   m_GameObject: {fileID: 3406261285952449502}
   m_BodyType: 0
   m_Simulated: 1
-  m_UseFullKinematicContacts: 0
+  m_UseFullKinematicContacts: 1
   m_UseAutoMass: 0
-  m_Mass: 1
+  m_Mass: 0.0001
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 0
@@ -198,11 +224,12 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3984073493991197427}
-  - component: {fileID: 5506335263501405340}
+  - component: {fileID: 8945199542606850639}
+  - component: {fileID: 6576569389803073727}
   - component: {fileID: 6363447458094721210}
   m_Layer: 0
   m_Name: Noise Area
-  m_TagString: Untagged
+  m_TagString: NoiseArea
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -222,42 +249,62 @@ Transform:
   m_Children: []
   m_Father: {fileID: 647076845276568180}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!58 &5506335263501405340
-CircleCollider2D:
+--- !u!33 &8945199542606850639
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5386235335809729285}
+  m_Mesh: {fileID: 0}
+--- !u!23 &6576569389803073727
+MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5386235335809729285}
   m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 1
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
-  m_Radius: 0.5
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &6363447458094721210
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -271,8 +318,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ninja.Gameplay.Player.NoiseController
   controller: {fileID: 7282979212160062182}
-  noiseArea: {fileID: 5506335263501405340}
   defaultNoise: 1
+  lerpSpeed: 5
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 64
+  rayCount: 36
+  noiseMaterial: {fileID: 0}
+  noiseColor: {r: 0.3, g: 0.6, b: 1, a: 0.15}
+  noiseCollider: {fileID: 0}
 --- !u!1 &8518458485645843067
 GameObject:
   m_ObjectHideFlags: 0
@@ -283,7 +337,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4167403640585022850}
   - component: {fileID: 5469401904262936008}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Body
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -330,7 +384,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -351,7 +405,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0

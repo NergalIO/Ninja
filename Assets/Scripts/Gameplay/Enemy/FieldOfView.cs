@@ -1,8 +1,10 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEditor;
-using Ninja.Core;
+using Ninja.Core.Events;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Ninja.Gameplay.Enemy
 {
@@ -10,113 +12,97 @@ namespace Ninja.Gameplay.Enemy
     {
         [Header("FOV Settings")]
         [SerializeField] private float viewRadius = 6f;
-        [Range(0, 360)]
-        [SerializeField] private float viewAngleHorizontal = 90f;
-        [Range(0, 180)]
-        [SerializeField] private float viewAngleVertical = 60f;
-
-        [Header("Ray settings")]
-        [SerializeField] private int rayCountHorizontal = 60;
-        [SerializeField] private int rayCountVertical = 30;
-        [SerializeField] private LayerMask targetMask;
+        [SerializeField, Range(0, 360)] private float viewAngle = 90f;
+        [SerializeField] private int rayCount = 60;
         [SerializeField] private LayerMask obstacleMask;
-
-        [Header("Debug")]
-        [SerializeField] private bool showDebugInfo;
 
         [Header("Rendering")]
         [SerializeField] private Material fovMaterial;
-        [SerializeField] private MeshRenderer meshRenderer;
+        [SerializeField] private Color normalColor = new Color(0.5f, 0.5f, 0.5f, 0.3f);
+        [SerializeField] private Color alertColor = new Color(1f, 0f, 0f, 0.3f);
 
         private Transform target;
         private Mesh mesh;
+        private MeshRenderer meshRenderer;
         private Vector3 origin;
-        private float startAngleHorizontal;
+        private float startAngle;
         private bool canSeeTarget;
+        private float detectionLevel = 0f;
+        private bool isPaused;
 
         public float ViewRadius => viewRadius;
-        public float ViewAngleHorizontal => viewAngleHorizontal;
-        public float ViewAngleVertical => viewAngleVertical;
+        public float ViewAngle => viewAngle;
         public bool CanSeeTarget => canSeeTarget;
+
+        public void SetTarget(Transform t) => target = t;
+        
+        /// <summary>
+        /// Установить уровень обнаружения для плавного изменения цвета (0-1)
+        /// </summary>
+        public void SetDetectionLevel(float level) => detectionLevel = Mathf.Clamp01(level);
 
         private void Start()
         {
-            MeshFilter meshFilter = GetComponent<MeshFilter>();
-            if (meshFilter == null)
-            {
-                meshFilter = gameObject.AddComponent<MeshFilter>();
-            }
+            var filter = GetComponent<MeshFilter>() ?? gameObject.AddComponent<MeshFilter>();
+            mesh = new Mesh { name = "FOV Mesh" };
+            filter.mesh = mesh;
 
-            mesh = new Mesh();
-            mesh.name = "FOV Mesh";
-            meshFilter.mesh = mesh;
-
-            if (meshRenderer == null)
+            meshRenderer = GetComponent<MeshRenderer>() ?? gameObject.AddComponent<MeshRenderer>();
+            
+            if (fovMaterial == null)
             {
-                meshRenderer = GetComponent<MeshRenderer>();
-                if (meshRenderer == null)
-                {
-                    meshRenderer = gameObject.AddComponent<MeshRenderer>();
-                }
-            }
-
-            if (fovMaterial == null && meshRenderer != null)
-            {
-                fovMaterial = meshRenderer.material;
-                if (fovMaterial == null)
-                {
-                    fovMaterial = new Material(Shader.Find("Sprites/Default"));
-                    fovMaterial.color = new Color(0.5f, 0.5f, 0.5f, 0.3f);
-                    meshRenderer.material = fovMaterial;
-                }
+                fovMaterial = new Material(Shader.Find("Sprites/Default")) { color = normalColor };
+                meshRenderer.material = fovMaterial;
             }
         }
 
-        public void SetTarget(Transform targetTransform)
+        private void OnEnable()
         {
-            target = targetTransform;
+            Events.Subscribe(GameEvents.GamePaused, OnGamePaused);
+            Events.Subscribe(GameEvents.GameResumed, OnGameResumed);
         }
+
+        private void OnDisable()
+        {
+            Events.Unsubscribe(GameEvents.GamePaused, OnGamePaused);
+            Events.Unsubscribe(GameEvents.GameResumed, OnGameResumed);
+        }
+
+        private void OnGamePaused(EventArgs e) => isPaused = true;
+        private void OnGameResumed(EventArgs e) => isPaused = false;
 
         private void LateUpdate()
         {
+            if (isPaused) return;
+            
             origin = transform.position;
-            float currentRotation = transform.eulerAngles.z;
-            startAngleHorizontal = currentRotation - viewAngleHorizontal / 2f;
+            startAngle = transform.eulerAngles.z - viewAngle / 2f;
 
             GenerateMesh();
             DetectTarget();
-            UpdateMeshColor();
+            UpdateColor();
         }
 
         private void GenerateMesh()
         {
-            float angleStepHorizontal = viewAngleHorizontal / rayCountHorizontal;
-            
-            List<Vector3> viewPoints = new List<Vector3>();
-            
-            for (int h = 0; h <= rayCountHorizontal; h++)
+            float angleStep = viewAngle / rayCount;
+            var points = new List<Vector3> { Vector3.zero };
+
+            for (int i = 0; i <= rayCount; i++)
             {
-                float horizontalAngle = startAngleHorizontal + angleStepHorizontal * h;
-                Vector3 dir = FieldOfViewUtils.DirFromAngle(horizontalAngle, 0f);
-                FieldOfViewUtils.ViewCastInfo info = FieldOfViewUtils.ViewCast2D(origin, dir, viewRadius, obstacleMask, target);
-                viewPoints.Add(info.point);
+                float angle = (startAngle + angleStep * i) * Mathf.Deg2Rad;
+                var dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                
+                var hit = Physics2D.Raycast(origin, dir, viewRadius, obstacleMask);
+                var point = hit.collider != null && hit.transform != target
+                    ? (Vector3)hit.point
+                    : origin + (Vector3)(dir * viewRadius);
+
+                points.Add(transform.InverseTransformPoint(point));
             }
 
-            if (viewPoints.Count < 3)
-                return;
-
-            int vertexCount = viewPoints.Count + 1;
-            Vector3[] vertices = new Vector3[vertexCount];
-            List<int> triangles = new List<int>();
-
-            vertices[0] = Vector3.zero;
-
-            for (int i = 0; i < viewPoints.Count; i++)
-            {
-                vertices[i + 1] = transform.InverseTransformPoint(viewPoints[i]);
-            }
-
-            for (int i = 1; i < viewPoints.Count; i++)
+            var triangles = new List<int>();
+            for (int i = 1; i < points.Count - 1; i++)
             {
                 triangles.Add(0);
                 triangles.Add(i);
@@ -124,152 +110,80 @@ namespace Ninja.Gameplay.Enemy
             }
 
             mesh.Clear();
-            mesh.vertices = vertices;
-            mesh.triangles = triangles.ToArray();
+            mesh.SetVertices(points);
+            mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
         }
 
         private void DetectTarget()
         {
             canSeeTarget = false;
+            if (target == null) return;
 
-            if (target == null)
-                return;
+            var toTarget = target.position - origin;
+            float dist = toTarget.magnitude;
 
-            Vector3 directionToTarget = (target.position - origin).normalized;
-            float distanceToTarget = Vector3.Distance(origin, target.position);
+            if (dist > viewRadius) return;
 
-            if (distanceToTarget > viewRadius)
-                return;
+            float forward = transform.eulerAngles.z * Mathf.Deg2Rad;
+            var forwardDir = new Vector2(Mathf.Cos(forward), Mathf.Sin(forward));
+            float angle = Vector2.Angle(forwardDir, toTarget.normalized);
 
-            Vector3 forward = FieldOfViewUtils.DirFromAngle(transform.eulerAngles.z, 0f);
-            float angleToTarget = FieldOfViewUtils.CalculateAngleIn2D(forward, directionToTarget);
-            
-            if (angleToTarget == float.MaxValue || angleToTarget > viewAngleHorizontal / 2f)
-                return;
+            if (angle > viewAngle / 2f) return;
 
-            canSeeTarget = FieldOfViewUtils.CheckLineOfSight2D(origin, target.position, distanceToTarget, obstacleMask, target);
+            var hit = Physics2D.Raycast(origin, toTarget.normalized, dist, obstacleMask);
+            canSeeTarget = hit.collider == null || hit.transform == target;
         }
 
-        private void UpdateMeshColor()
+        private void UpdateColor()
         {
-            if (fovMaterial == null)
-            {
-                if (meshRenderer != null && meshRenderer.material != null)
-                {
-                    fovMaterial = meshRenderer.material;
-                }
-                else
-                {
-                    return;
-                }
-            }
-
-            Color meshColor = canSeeTarget ? new Color(1f, 0f, 0f, 0.3f) : new Color(0.5f, 0.5f, 0.5f, 0.3f);
+            if (meshRenderer == null) return;
             
-            if (meshRenderer != null)
-            {
-                MaterialPropertyBlock propBlock = new MaterialPropertyBlock();
-                meshRenderer.GetPropertyBlock(propBlock);
-                propBlock.SetColor("_Color", meshColor);
-                meshRenderer.SetPropertyBlock(propBlock);
-            }
-            else
-            {
-                fovMaterial.color = meshColor;
-            }
+            // Плавная интерполяция цвета по уровню обнаружения
+            Color currentColor = Color.Lerp(normalColor, alertColor, detectionLevel);
+            
+            var block = new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(block);
+            block.SetColor("_Color", currentColor);
+            meshRenderer.SetPropertyBlock(block);
         }
 
-        private void OnDrawGizmos()
-        {
-            if (!showDebugInfo)
-                return;
-
-            DrawFieldOfView();
-        }
-
+#if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-            DrawFieldOfView();
-        }
+            var pos = Application.isPlaying ? origin : transform.position;
+            float start = Application.isPlaying ? startAngle : transform.eulerAngles.z - viewAngle / 2f;
 
-        private void DrawFieldOfView()
-        {
-            Vector3 currentOrigin = Application.isPlaying ? origin : transform.position;
-            float currentZRotation = transform.eulerAngles.z;
-            float currentStartAngleHorizontal = Application.isPlaying ? startAngleHorizontal : currentZRotation - viewAngleHorizontal / 2f;
-
-            bool playerInFOV = canSeeTarget;
-            Color baseColor = playerInFOV ? new Color(1f, 0f, 0f, 0.3f) : new Color(0.5f, 0.5f, 0.5f, 0.3f);
-            Color rayColor = playerInFOV ? new Color(1f, 0f, 0f, 0.5f) : new Color(0.6f, 0.6f, 0.6f, 0.4f);
-
-            Gizmos.color = baseColor;
-            GizmosUtils.DrawCircle(currentOrigin, viewRadius);
-
-            int gizmoRayCount = Mathf.Max(20, rayCountHorizontal / 2);
-            float angleStep = viewAngleHorizontal / gizmoRayCount;
-
-            Vector3 leftBoundaryDir = FieldOfViewUtils.DirFromAngle(currentStartAngleHorizontal, 0f);
-            Gizmos.color = rayColor;
-            Gizmos.DrawRay(currentOrigin, leftBoundaryDir * viewRadius);
-
-            Vector3 rightBoundaryDir = FieldOfViewUtils.DirFromAngle(currentStartAngleHorizontal + viewAngleHorizontal, 0f);
-            Gizmos.DrawRay(currentOrigin, rightBoundaryDir * viewRadius);
-
-            List<Vector3> arcPoints = new List<Vector3>();
+            // Цвет по уровню обнаружения
+            Gizmos.color = Color.Lerp(normalColor, alertColor, detectionLevel);
             
-            for (int i = 0; i <= gizmoRayCount; i++)
+            // Draw arc
+            float step = viewAngle / 20f;
+            Vector3 prevPoint = pos + DirFromAngle(start) * viewRadius;
+            
+            for (float a = step; a <= viewAngle; a += step)
             {
-                float horizontalAngle = currentStartAngleHorizontal + angleStep * i;
-                Vector3 direction = FieldOfViewUtils.DirFromAngle(horizontalAngle, 0f);
-                
-                Vector3 endPoint;
-                bool hitObstacle = false;
-                
-                if (Application.isPlaying)
-                {
-                    FieldOfViewUtils.ViewCastInfo info = FieldOfViewUtils.ViewCast2D(currentOrigin, direction, viewRadius, obstacleMask);
-                    endPoint = info.point;
-                    hitObstacle = info.hit;
-                }
-                else
-                {
-                    endPoint = currentOrigin + direction * viewRadius;
-                }
-
-                arcPoints.Add(endPoint);
-
-                Gizmos.color = hitObstacle ? new Color(rayColor.r, rayColor.g, rayColor.b, rayColor.a * 0.5f) : rayColor;
-                float rayLength = hitObstacle ? Vector3.Distance(currentOrigin, endPoint) : viewRadius;
-                Gizmos.DrawRay(currentOrigin, direction * rayLength);
+                var point = pos + DirFromAngle(start + a) * viewRadius;
+                Gizmos.DrawLine(prevPoint, point);
+                prevPoint = point;
             }
 
-            #if UNITY_EDITOR
-            if (arcPoints.Count >= 2)
-            {
-                Vector3[] vertices = new Vector3[arcPoints.Count + 1];
-                vertices[0] = currentOrigin;
-                for (int i = 0; i < arcPoints.Count; i++)
-                {
-                    vertices[i + 1] = arcPoints[i];
-                }
-
-                Handles.color = baseColor;
-                Handles.DrawAAConvexPolygon(vertices);
-            }
-            #endif
-
-            for (int i = 1; i < arcPoints.Count; i++)
-            {
-                Gizmos.color = rayColor;
-                Gizmos.DrawLine(arcPoints[i - 1], arcPoints[i]);
-            }
+            // Draw boundaries
+            Gizmos.DrawLine(pos, pos + DirFromAngle(start) * viewRadius);
+            Gizmos.DrawLine(pos, pos + DirFromAngle(start + viewAngle) * viewRadius);
 
             if (target != null)
             {
-                Gizmos.color = canSeeTarget ? Color.red : new Color(0.5f, 0.5f, 0.5f, 0.3f);
-                Gizmos.DrawLine(currentOrigin, target.position);
+                Gizmos.color = canSeeTarget ? Color.red : Color.gray;
+                Gizmos.DrawLine(pos, target.position);
             }
         }
+
+        private Vector3 DirFromAngle(float angle)
+        {
+            float rad = angle * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0);
+        }
+#endif
     }
 }
